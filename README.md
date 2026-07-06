@@ -127,19 +127,26 @@ smoke test.
 ## Import a script from YouTube
 
 Paste a YouTube URL and click "Extract & rewrite": `pipeline/youtube_import.py`
-pulls the video's transcript (via the `youtube-transcript-api` library, no
-API key needed) and sends it to Claude with a prompt that studies its tone,
-pacing, and structure, then writes a **brand-new, original script** in that
-same style — different characters, different specific content, no reused
-sentences. The transcript itself is never shown to you or stored; it's only
-used as internal reference material for that one rewrite call. This keeps
-the feature on the "inspired by the style" side of the line rather than
+pulls the video's transcript (via the `youtube-transcript-api` library) and
+sends it to Claude with a prompt that studies its tone, pacing, and
+structure, then writes a **brand-new, original script** in that same style —
+different characters, different specific content, no reused sentences. The
+transcript itself is never shown to you or stored; it's only used as
+internal reference material for that one rewrite call. This keeps the
+feature on the "inspired by the style" side of the line rather than
 producing a reskinned copy of someone else's work.
 
-Caveat: YouTube sometimes blocks transcript requests from cloud server IPs
-(a known limitation of the unofficial library this uses) — if that happens
-you'll get a clear error rather than a silent failure; fixing it for good
-would mean configuring a proxy for `youtube-transcript-api`.
+**This needs a proxy to actually work when hosted on Render (or any cloud
+platform).** YouTube blocks transcript requests from most datacenter IPs,
+including Render's — this isn't a code bug, it's YouTube's own IP-blocking,
+confirmed via the `IpBlocked`/`RequestBlocked` errors the library raises.
+Fix: sign up for a cheap Webshare rotating-residential proxy plan (~$1/month
+— this is specifically what `youtube-transcript-api`'s own docs recommend
+for this exact problem), then set two more env vars on Render:
+`WEBSHARE_PROXY_USERNAME` and `WEBSHARE_PROXY_PASSWORD`. No code changes
+needed — `pipeline/youtube_import.py` picks them up automatically. Without
+a proxy configured, this feature works when run locally (your home IP isn't
+blocked) but will fail on Render with a clear error message telling you why.
 
 ## Choosing an AI visual generator and a real voice
 

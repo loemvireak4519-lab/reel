@@ -21,5 +21,9 @@ services:
         sync: false
       - key: GOOGLE_TTS_API_KEY
         sync: false
+      - key: WEBSHARE_PROXY_USERNAME
+        sync: false
+      - key: WEBSHARE_PROXY_PASSWORD
+        sync: false
       - key: ACCESS_PASSWORD
         sync: false

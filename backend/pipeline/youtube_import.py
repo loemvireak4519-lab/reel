@@ -53,9 +53,38 @@ def extract_video_id(url: str) -> str:
     raise ValueError(f"Could not extract a video ID from URL: {url}")
 
 
+def _build_transcript_api():
+    """Uses a Webshare rotating-residential proxy if configured (recommended
+    by youtube-transcript-api specifically for cloud-hosted services, since
+    YouTube blocks most datacenter IPs including Render's). Falls back to a
+    direct connection if no proxy env vars are set, which works locally but
+    will likely hit IpBlocked/RequestBlocked when running on Render."""
+    from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api.proxies import WebshareProxyConfig, GenericProxyConfig
+
+    webshare_user = os.environ.get("WEBSHARE_PROXY_USERNAME")
+    webshare_pass = os.environ.get("WEBSHARE_PROXY_PASSWORD")
+    generic_proxy_url = os.environ.get("PROXY_URL")
+
+    if webshare_user and webshare_pass:
+        return YouTubeTranscriptApi(
+            proxy_config=WebshareProxyConfig(
+                proxy_username=webshare_user,
+                proxy_password=webshare_pass,
+            )
+        )
+    if generic_proxy_url:
+        return YouTubeTranscriptApi(
+            proxy_config=GenericProxyConfig(
+                http_url=generic_proxy_url,
+                https_url=generic_proxy_url,
+            )
+        )
+    return YouTubeTranscriptApi()
+
+
 def fetch_transcript_text(url: str) -> str:
     """Internal use only — never exposed directly to the frontend."""
-    from youtube_transcript_api import YouTubeTranscriptApi
     from youtube_transcript_api._errors import (
         TranscriptsDisabled,
         NoTranscriptFound,
@@ -67,7 +96,7 @@ def fetch_transcript_text(url: str) -> str:
     video_id = extract_video_id(url)
 
     try:
-        ytt_api = YouTubeTranscriptApi()
+        ytt_api = _build_transcript_api()
         fetched = ytt_api.fetch(video_id)
     except TranscriptsDisabled:
         raise RuntimeError("This video has captions/transcripts disabled.")
@@ -77,9 +106,10 @@ def fetch_transcript_text(url: str) -> str:
         raise RuntimeError("This video is unavailable (private, deleted, or region-locked).")
     except (IpBlocked, RequestBlocked):
         raise RuntimeError(
-            "YouTube is blocking transcript requests from this server's IP address "
-            "(common for cloud-hosted services). This isn't something a retry fixes — "
-            "it would need a proxy/residential IP configured for the youtube-transcript-api library."
+            "YouTube is blocking transcript requests from this server's IP address. "
+            "Set WEBSHARE_PROXY_USERNAME and WEBSHARE_PROXY_PASSWORD (a cheap Webshare "
+            "rotating-residential proxy plan, ~$1/month, is what youtube-transcript-api "
+            "recommends specifically for this) to fix it — see the README."
         )
 
     text = " ".join(snippet.text for snippet in fetched.snippets)

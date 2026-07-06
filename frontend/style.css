@@ -162,6 +162,14 @@ h2 {
   padding: 10px 12px;
 }
 
+.voice-picker-row {
+  display: flex;
+  gap: 8px;
+}
+
+.voice-picker-row select { flex: 1; }
+.voice-picker-row .secondary-btn { white-space: nowrap; padding: 10px 14px; font-size: 12px; }
+
 .field { display: block; margin-bottom: 20px; }
 
 .field-label {

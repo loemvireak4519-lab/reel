@@ -78,32 +78,85 @@ voiceoverMode.addEventListener("change", () => {
   if (isAi) loadVoiceList();
 });
 
+const voicePreviewBtn = document.getElementById("voicePreviewBtn");
+const voicePreviewAudio = document.getElementById("voicePreviewAudio");
+let currentVoices = [];
+
+voiceoverMode.addEventListener("change", () => {
+  const isAi = voiceoverMode.value === "ai";
+  uploadVoiceoverRow.classList.toggle("hidden", isAi);
+  aiVoiceoverRow.classList.toggle("hidden", !isAi);
+  voiceoverFileInput.required = !isAi;
+  if (isAi) loadVoiceList();
+});
+
 voiceProviderSelect.addEventListener("change", loadVoiceList);
+voicePickerSelect.addEventListener("change", updatePreviewButtonState);
 
 async function loadVoiceList() {
   voicePickerSelect.innerHTML = '<option value="">Loading voices…</option>';
+  voicePreviewBtn.disabled = true;
   try {
     const res = await fetch(`/api/voices?provider=${voiceProviderSelect.value}`);
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
 
-    if (!data.voices || data.voices.length === 0) {
+    currentVoices = data.voices || [];
+    if (currentVoices.length === 0) {
       voicePickerSelect.innerHTML = '<option value="">No voices found — using default</option>';
       return;
     }
 
     voicePickerSelect.innerHTML = "";
-    data.voices.forEach((voice) => {
+    currentVoices.forEach((voice) => {
       const opt = document.createElement("option");
       opt.value = voice.id;
       opt.textContent = voice.description ? `${voice.name} — ${voice.description}` : voice.name;
       voicePickerSelect.appendChild(opt);
     });
+    updatePreviewButtonState();
   } catch (err) {
     voicePickerSelect.innerHTML = '<option value="">Could not load voices — using default</option>';
     console.error("failed to load voices", err);
   }
 }
+
+function updatePreviewButtonState() {
+  const selected = currentVoices.find((v) => v.id === voicePickerSelect.value);
+  voicePreviewBtn.disabled = !selected;
+}
+
+voicePreviewBtn.addEventListener("click", async () => {
+  const selected = currentVoices.find((v) => v.id === voicePickerSelect.value);
+  if (!selected) return;
+
+  const provider = voiceProviderSelect.value;
+  const originalLabel = voicePreviewBtn.textContent;
+
+  if (provider === "elevenlabs" && selected.preview_url) {
+    // Free, pre-recorded sample — just play it directly.
+    voicePreviewAudio.src = selected.preview_url;
+    voicePreviewAudio.play();
+    return;
+  }
+
+  // Google has no free preview — generate a short sample on demand (small real cost).
+  voicePreviewBtn.disabled = true;
+  voicePreviewBtn.textContent = "Generating…";
+  try {
+    const url = `/api/voices/preview?provider=${provider}&voice_id=${encodeURIComponent(selected.id)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(await res.text());
+    const blob = await res.blob();
+    voicePreviewAudio.src = URL.createObjectURL(blob);
+    voicePreviewAudio.play();
+  } catch (err) {
+    console.error("preview generation failed", err);
+  } finally {
+    voicePreviewBtn.disabled = false;
+    voicePreviewBtn.textContent = originalLabel;
+  }
+});
 
 // ---------------- YouTube import: extract transcript, rewrite as original script ----------------
 

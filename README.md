@@ -176,8 +176,12 @@ Two pickers in the input form beyond what's described above:
 - **Voice** — once you pick ElevenLabs or Google, the "Voice" dropdown
   populates with the real voices available on your account (fetched live
   via `GET /api/voices?provider=...`), so you're picking an actual named
-  voice instead of pasting an ID you'd have to look up separately. See
-  `pipeline/voices.py`.
+  voice instead of pasting an ID you'd have to look up separately. A
+  "▶ Preview" button next to the dropdown lets you hear it before choosing —
+  ElevenLabs voices have a free pre-recorded sample (`preview_url`, no cost);
+  Google has no equivalent, so its preview generates a few words on demand
+  via `GET /api/voices/preview` (a small real cost per click, unlike
+  ElevenLabs). See `pipeline/voices.py`.
 
 ## Long videos (10+ minutes)
 

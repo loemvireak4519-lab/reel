@@ -1,12 +1,20 @@
 """
 Powers the "pick a real voice" dropdown in the review UI, instead of asking
 the user to paste a raw voice ID they'd have to look up themselves.
+
+ElevenLabs voices come with a free, pre-recorded preview_url — no generation
+needed. Google Cloud TTS doesn't offer pre-recorded previews via its API, so
+previewing a Google voice means synthesizing a short sample on demand (see
+generate_preview_sample below) — a small real cost per preview click, unlike
+the free ElevenLabs previews.
 """
 import os
 import requests
 
 ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v1/voices"
 GOOGLE_VOICES_URL = "https://texttospeech.googleapis.com/v1/voices"
+
+PREVIEW_SAMPLE_TEXT = "Hello, this is a preview of this voice."
 
 
 def list_elevenlabs_voices() -> list[dict]:
@@ -83,4 +91,17 @@ def list_voices(provider: str, language_code: str = "en-US") -> list[dict]:
         return list_elevenlabs_voices()
     elif provider == "google":
         return list_google_voices(language_code)
+    raise ValueError(f"Unknown TTS provider: {provider!r}")
+
+
+def generate_preview_sample(provider: str, voice_id: str, dest_path: str) -> str:
+    """Only used for providers without a free pre-recorded preview (Google).
+    ElevenLabs previews should just use the preview_url directly instead —
+    calling this for ElevenLabs would waste a real API call unnecessarily."""
+    from .tts import generate_google_voiceover, generate_elevenlabs_voiceover
+
+    if provider == "google":
+        return generate_google_voiceover(PREVIEW_SAMPLE_TEXT, dest_path, voice_name=voice_id)
+    elif provider == "elevenlabs":
+        return generate_elevenlabs_voiceover(PREVIEW_SAMPLE_TEXT, dest_path, voice_id=voice_id)
     raise ValueError(f"Unknown TTS provider: {provider!r}")

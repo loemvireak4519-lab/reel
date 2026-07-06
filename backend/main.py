@@ -16,7 +16,8 @@ from pipeline.models import Job
 from pipeline.orchestrator import prepare_pipeline, export_pipeline, STORAGE_DIR
 from pipeline.footage_search import find_candidates
 from pipeline.youtube_import import generate_script_from_youtube
-from pipeline.voices import list_voices
+from pipeline.voices import list_voices, generate_preview_sample
+import tempfile
 
 app = FastAPI(title="Video Pipeline API")
 
@@ -148,6 +149,26 @@ async def get_voices(provider: str, language_code: str = "en-US"):
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"voices": voices}
+
+
+@app.get("/api/voices/preview")
+async def voice_preview(provider: str, voice_id: str):
+    """Generates a short on-demand sample for providers without a free
+    pre-recorded preview (i.e. Google — ElevenLabs previews should use the
+    preview_url from /api/voices directly instead, which costs nothing)."""
+    if provider == "elevenlabs":
+        raise HTTPException(400, "ElevenLabs previews should use the preview_url from /api/voices directly")
+
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        generate_preview_sample(provider, voice_id, tmp_path)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    return FileResponse(tmp_path, media_type="audio/mpeg", filename="preview.mp3")
 
 
 # ---- Prepare: upload script + voiceover, run stages up to review ----------

@@ -56,31 +56,37 @@ def list_google_voices(language_code: str = "en-US") -> list[dict]:
     resp.raise_for_status()
     voices = resp.json().get("voices", [])
 
-    # Studio and Neural2 voices sound the most natural - surface those first.
-    def sort_key(v):
-        name = v["name"]
+    # Ranked roughly by how human/natural each tier actually sounds (and,
+    # not coincidentally, roughly by price): Studio and Chirp3-HD are the
+    # most natural — Chirp3-HD in particular adds real disfluencies and
+    # emotional intonation. Gemini-TTS models (when available on the
+    # account) support natural-language style prompts and are newer still.
+    # Older tiers were previously all lumped into "Standard" once they
+    # didn't match Studio/Neural2/Wavenet, which mislabeled genuinely
+    # natural-sounding Chirp3-HD voices as the lowest tier.
+    def _tier(name: str) -> tuple[int, str]:
+        if "Gemini" in name:
+            return (0, "Gemini-TTS (natural-language style control)")
         if "Studio" in name:
-            return 0
+            return (1, "Studio (most natural)")
+        if "Chirp3-HD" in name or "Chirp-HD" in name:
+            return (1, "Chirp3-HD (very natural, human-like)")
         if "Neural2" in name:
-            return 1
+            return (3, "Neural2")
+        if "Polyglot" in name:
+            return (3, "Polyglot")
         if "Wavenet" in name:
-            return 2
-        return 3
+            return (4, "Wavenet")
+        return (5, "Standard")
 
-    voices.sort(key=sort_key)
+    voices.sort(key=lambda v: _tier(v["name"])[0])
 
     return [
         {
             "id": v["name"],
             "name": v["name"],
             "gender": v.get("ssmlGender", ""),
-            "description": "Studio (most natural)"
-            if "Studio" in v["name"]
-            else "Neural2"
-            if "Neural2" in v["name"]
-            else "Wavenet"
-            if "Wavenet" in v["name"]
-            else "Standard",
+            "description": _tier(v["name"])[1],
         }
         for v in voices
     ]

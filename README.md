@@ -183,6 +183,14 @@ Two pickers in the input form beyond what's described above:
   via `GET /api/voices/preview` (a small real cost per click, unlike
   ElevenLabs). See `pipeline/voices.py`.
 
+Google's voice picker ranks by how natural each tier actually sounds:
+**Gemini-TTS** and **Chirp3-HD**/**Studio** (most human-like, disfluencies +
+real emotional intonation) → **Neural2**/**Polyglot** → **Wavenet** →
+**Standard** (avoid — sounds robotic). Chirp3-HD voices used to get
+mislabeled as "Standard" quality since the code only recognized
+Studio/Neural2/Wavenet by name — fixed so the actual best-sounding options
+surface at the top instead of being buried at the bottom.
+
 ## Theme picker — starter scripts for popular niches
 
 A "Theme" dropdown sits above the Script box with 10 of the strongest niches

@@ -125,11 +125,20 @@ a persistent disk so rendered videos survive a restart.
 1. Push this folder to a GitHub repo (it already includes `Dockerfile` and
    `render.yaml`).
 2. On Render: **New → Blueprint**, point it at the repo. It reads
-   `render.yaml` and sets up the service, disk, and the env var slots
+   `render.yaml` and sets up the service and the env var slots
    automatically — you just fill in the values in the dashboard:
    `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`,
    `STABILITY_API_KEY`, `RUNWAY_API_KEY`, and `ACCESS_PASSWORD`.
 3. Deploy. You get a public URL.
+
+**This repo's `render.yaml` is set to Render's free tier** (no card required).
+The trade-off: no persistent disk, so rendered videos and job state are lost
+whenever the service restarts or redeploys, and the free tier spins down
+after inactivity (the first request after idling takes ~30-60s to wake back
+up). Fine for trying it out or occasional personal use. If you outgrow that,
+switch `plan: free` to `plan: starter` in `render.yaml` and add back a
+`disk:` block (see git history of this file for the exact block) — Render
+will then ask for payment info, which only you can enter.
 
 **Set `ACCESS_PASSWORD`.** The moment this is a public URL, anyone who finds
 it can trigger renders that spend *your* API credits. Setting this env var

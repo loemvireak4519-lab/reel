@@ -1,6 +1,6 @@
 import os
 import uuid
-import base64
+import secrets
 import threading
 
 from dotenv import load_dotenv
@@ -8,7 +8,7 @@ load_dotenv()
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -22,36 +22,73 @@ app = FastAPI(title="Video Pipeline API")
 
 # ---- Access gate ----------------------------------------------------------
 # Set ACCESS_PASSWORD when deploying this somewhere reachable by other people.
-# Every visitor is prompted for a username (anything) + this password before
-# the site loads, so a shared link can't quietly burn through your Anthropic/
-# OpenAI/Pexels/Runway credits. Leave ACCESS_PASSWORD unset for local-only
-# use and the gate is skipped entirely.
+# Visitors get a real login page (not a native browser Basic-Auth prompt —
+# that approach re-prompts unpredictably for background API calls in a JS
+# app) and a session cookie once they enter the password, so a shared link
+# can't quietly burn through your Anthropic/OpenAI/Pexels/Runway credits.
+# Leave ACCESS_PASSWORD unset for local-only use and the gate is skipped.
 ACCESS_PASSWORD = os.environ.get("ACCESS_PASSWORD")
+SESSION_COOKIE_NAME = "reel_session"
+VALID_SESSIONS: set[str] = set()
+
+LOGIN_PAGE_HTML = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Reel — sign in</title>
+<style>
+  body {{ margin:0; background:#14161a; color:#e8e6e1; font-family:Inter,sans-serif;
+         display:flex; align-items:center; justify-content:center; height:100vh; }}
+  form {{ background:#1c1f26; border:1px solid #2b2f38; border-radius:10px; padding:36px;
+          width:320px; }}
+  h1 {{ font-size:20px; margin:0 0 20px; font-family:'Space Grotesk',sans-serif; }}
+  input {{ width:100%; background:#10121680; border:1px solid #2b2f38; border-radius:6px;
+           color:#e8e6e1; padding:10px 12px; font-size:14px; margin-bottom:14px; box-sizing:border-box; }}
+  button {{ width:100%; background:#f2a93b; color:#1a1200; border:none; border-radius:6px;
+            padding:12px; font-weight:600; cursor:pointer; font-size:14px; }}
+  .err {{ color:#e5605a; font-size:13px; margin-bottom:14px; }}
+</style></head>
+<body>
+  <form method="post" action="/login">
+    <h1>●REC Reel — sign in</h1>
+    {error_html}
+    <input type="password" name="password" placeholder="Password" autofocus required />
+    <button type="submit">Sign in</button>
+  </form>
+</body></html>"""
 
 
-class BasicAuthMiddleware(BaseHTTPMiddleware):
+@app.get("/login", response_class=HTMLResponse)
+async def login_form():
+    return LOGIN_PAGE_HTML.format(error_html="")
+
+
+@app.post("/login")
+async def login_submit(password: str = Form(...)):
+    if password != ACCESS_PASSWORD:
+        return HTMLResponse(
+            LOGIN_PAGE_HTML.format(error_html='<div class="err">Wrong password.</div>'),
+            status_code=401,
+        )
+    token = secrets.token_urlsafe(32)
+    VALID_SESSIONS.add(token)
+    resp = RedirectResponse(url="/", status_code=303)
+    resp.set_cookie(SESSION_COOKIE_NAME, token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30)
+    return resp
+
+
+class SessionAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if not ACCESS_PASSWORD:
+        if not ACCESS_PASSWORD or request.url.path in ("/login",):
             return await call_next(request)
 
-        auth = request.headers.get("authorization", "")
-        if auth.startswith("Basic "):
-            try:
-                decoded = base64.b64decode(auth[6:]).decode("utf-8")
-                _, _, password = decoded.partition(":")
-                if password == ACCESS_PASSWORD:
-                    return await call_next(request)
-            except Exception:
-                pass
+        token = request.cookies.get(SESSION_COOKIE_NAME)
+        if token in VALID_SESSIONS:
+            return await call_next(request)
 
-        return Response(
-            "Authentication required",
-            status_code=401,
-            headers={"WWW-Authenticate": 'Basic realm="Reel"'},
-        )
+        if request.url.path.startswith("/api/"):
+            return Response('{"detail":"Not authenticated"}', status_code=401, media_type="application/json")
+        return RedirectResponse(url="/login", status_code=303)
 
 
-app.add_middleware(BasicAuthMiddleware)
+app.add_middleware(SessionAuthMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

@@ -219,8 +219,9 @@ will then ask for payment info, which only you can enter.
 
 **Set `ACCESS_PASSWORD`.** The moment this is a public URL, anyone who finds
 it can trigger renders that spend *your* API credits. Setting this env var
-turns on a login prompt (any username, this password) for the whole site —
-leave it unset only if you're fine with the link being open to anyone who
+turns on a real login page (a password field, not your browser's native
+Basic-Auth popup — that approach re-prompts unpredictably for background API
+calls in a JS app like this one) for the whole site — leave it unset only if you're fine with the link being open to anyone who
 has it. Share the password out of band (not in the same message as the URL).
 
 **If you outgrow a single server**: the persistent disk + in-memory job dict

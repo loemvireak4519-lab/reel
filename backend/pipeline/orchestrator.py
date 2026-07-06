@@ -54,7 +54,7 @@ def prepare_pipeline(job: Job, script: str) -> None:
                     scene.visual_type = "ai_image"
 
             if scene.visual_type in ("ai_video", "ai_image") and not scene.candidates:
-                ai_candidate = build_ai_candidate(scene.search_query, scene.visual_type)
+                ai_candidate = build_ai_candidate(scene.search_query, job.ai_quality)
                 scene.candidates = [ai_candidate]
                 scene.selected_candidate_id = ai_candidate.id
 
@@ -88,7 +88,7 @@ def export_pipeline(job: Job) -> None:
                 raise RuntimeError(f"Scene {scene.index} has no selected candidate")
 
             if candidate.source == "ai":
-                scene.asset_path = generate_for_candidate(candidate, assets_dir, scene.index)
+                scene.asset_path = generate_for_candidate(candidate, assets_dir, scene.index, ai_quality=job.ai_quality)
             else:
                 scene.asset_path = download_candidate(candidate, assets_dir, scene.index)
 

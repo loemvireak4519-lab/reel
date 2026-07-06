@@ -24,6 +24,16 @@
       <p class="sub">Drop in your narration script and voiceover. Reel splits it into scenes, tags keywords and emotion, finds stock footage candidates, and times everything to your voice — then hands you a timeline to review before anything renders.</p>
 
       <form id="jobForm">
+        <label class="field youtube-field">
+          <span class="field-label">Import from YouTube <em>(optional)</em></span>
+          <div class="youtube-row">
+            <input type="url" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
+            <button type="button" id="youtubeExtractBtn" class="secondary-btn">Extract &amp; rewrite</button>
+          </div>
+          <p class="hint">Pulls the video's transcript, then has Claude write a brand-new original script in the same tone/pacing — never a copy. Review and edit the result below before continuing.</p>
+          <div class="youtube-status hidden" id="youtubeStatus"></div>
+        </label>
+
         <label class="field">
           <span class="field-label">Script</span>
           <textarea id="script" placeholder="Paste your voiceover script here, sentence by sentence..." required></textarea>
@@ -62,8 +72,21 @@
             </select>
           </label>
           <label class="field file-field">
-            <span class="field-label">Voice ID / name <em>(optional)</em></span>
-            <input type="text" id="voiceId" placeholder="Leave blank to use a natural default voice" />
+            <span class="field-label">Voice</span>
+            <select id="voicePicker">
+              <option value="">Loading voices…</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field file-field">
+            <span class="field-label">AI visual generator <em>(used only when no stock footage matches)</em></span>
+            <select id="aiQuality">
+              <option value="fast" selected>Fast — Stability Core (image, cheap &amp; quick)</option>
+              <option value="high">High quality — Stability Ultra (image, slower)</option>
+              <option value="video">Video — Runway (actual video generation, slowest)</option>
+            </select>
           </label>
         </div>
 

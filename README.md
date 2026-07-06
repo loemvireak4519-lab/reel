@@ -124,6 +124,38 @@ alignment (Whisper), and actual stock/AI results. Drop your keys into
 `backend/.env` and run one short script through it as your first live
 smoke test.
 
+## Import a script from YouTube
+
+Paste a YouTube URL and click "Extract & rewrite": `pipeline/youtube_import.py`
+pulls the video's transcript (via the `youtube-transcript-api` library, no
+API key needed) and sends it to Claude with a prompt that studies its tone,
+pacing, and structure, then writes a **brand-new, original script** in that
+same style — different characters, different specific content, no reused
+sentences. The transcript itself is never shown to you or stored; it's only
+used as internal reference material for that one rewrite call. This keeps
+the feature on the "inspired by the style" side of the line rather than
+producing a reskinned copy of someone else's work.
+
+Caveat: YouTube sometimes blocks transcript requests from cloud server IPs
+(a known limitation of the unofficial library this uses) — if that happens
+you'll get a clear error rather than a silent failure; fixing it for good
+would mean configuring a proxy for `youtube-transcript-api`.
+
+## Choosing an AI visual generator and a real voice
+
+Two pickers in the input form beyond what's described above:
+
+- **AI visual generator** — a quality-tier dropdown (Fast / High quality /
+  Video) used only for scenes where no stock footage matches. Maps to
+  Stability Core (fast/cheap), Stability Ultra (slower, higher quality), or
+  Runway (actual video generation, slowest and priciest). See
+  `pipeline/ai_generator.py`.
+- **Voice** — once you pick ElevenLabs or Google, the "Voice" dropdown
+  populates with the real voices available on your account (fetched live
+  via `GET /api/voices?provider=...`), so you're picking an actual named
+  voice instead of pasting an ID you'd have to look up separately. See
+  `pipeline/voices.py`.
+
 ## Long videos (10+ minutes)
 
 A 10-minute script is roughly 1,300-1,500 words — enough to exceed both

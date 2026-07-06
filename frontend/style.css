@@ -98,6 +98,70 @@ h2 {
   margin-bottom: 0;
 }
 
+.youtube-field { margin-bottom: 24px; }
+
+.youtube-row {
+  display: flex;
+  gap: 10px;
+}
+
+.youtube-row input[type="url"] {
+  flex: 1;
+  background-color: #10121680;
+  border: 1px solid var(--panel-line);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 14px;
+  padding: 10px 12px;
+}
+
+.secondary-btn {
+  background: none;
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.secondary-btn:hover { background: #2a220f; }
+.secondary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+.youtube-status {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 5px;
+}
+
+.youtube-status.working { color: var(--accent); background: #2a220f; }
+.youtube-status.success { color: var(--ok); background: #16281f; }
+.youtube-status.failure { color: var(--err); background: #2a1414; }
+
+.field-row select {
+  width: 100%;
+  background-color: #10121680;
+  border: 1px solid var(--panel-line);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
 .field { display: block; margin-bottom: 20px; }
 
 .field-label {

@@ -67,13 +67,84 @@ const voiceoverMode = document.getElementById("voiceoverMode");
 const uploadVoiceoverRow = document.getElementById("uploadVoiceoverRow");
 const aiVoiceoverRow = document.getElementById("aiVoiceoverRow");
 const voiceoverFileInput = document.getElementById("voiceover");
+const voiceProviderSelect = document.getElementById("voiceProvider");
+const voicePickerSelect = document.getElementById("voicePicker");
 
 voiceoverMode.addEventListener("change", () => {
   const isAi = voiceoverMode.value === "ai";
   uploadVoiceoverRow.classList.toggle("hidden", isAi);
   aiVoiceoverRow.classList.toggle("hidden", !isAi);
   voiceoverFileInput.required = !isAi;
+  if (isAi) loadVoiceList();
 });
+
+voiceProviderSelect.addEventListener("change", loadVoiceList);
+
+async function loadVoiceList() {
+  voicePickerSelect.innerHTML = '<option value="">Loading voices…</option>';
+  try {
+    const res = await fetch(`/api/voices?provider=${voiceProviderSelect.value}`);
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    if (!data.voices || data.voices.length === 0) {
+      voicePickerSelect.innerHTML = '<option value="">No voices found — using default</option>';
+      return;
+    }
+
+    voicePickerSelect.innerHTML = "";
+    data.voices.forEach((voice) => {
+      const opt = document.createElement("option");
+      opt.value = voice.id;
+      opt.textContent = voice.description ? `${voice.name} — ${voice.description}` : voice.name;
+      voicePickerSelect.appendChild(opt);
+    });
+  } catch (err) {
+    voicePickerSelect.innerHTML = '<option value="">Could not load voices — using default</option>';
+    console.error("failed to load voices", err);
+  }
+}
+
+// ---------------- YouTube import: extract transcript, rewrite as original script ----------------
+
+const youtubeUrlInput = document.getElementById("youtubeUrl");
+const youtubeExtractBtn = document.getElementById("youtubeExtractBtn");
+const youtubeStatus = document.getElementById("youtubeStatus");
+const scriptTextarea = document.getElementById("script");
+
+youtubeExtractBtn.addEventListener("click", async () => {
+  const url = youtubeUrlInput.value.trim();
+  if (!url) {
+    showYoutubeStatus("Paste a YouTube URL first.", "failure");
+    return;
+  }
+
+  youtubeExtractBtn.disabled = true;
+  showYoutubeStatus("Fetching transcript and writing an original script in the same style…", "working");
+
+  try {
+    const res = await fetch("/api/youtube/rewrite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to extract/rewrite.");
+
+    scriptTextarea.value = data.script;
+    showYoutubeStatus("Done — new original script filled in below. Review and edit as you like.", "success");
+  } catch (err) {
+    showYoutubeStatus(err.message, "failure");
+  } finally {
+    youtubeExtractBtn.disabled = false;
+  }
+});
+
+function showYoutubeStatus(message, kind) {
+  youtubeStatus.textContent = message;
+  youtubeStatus.className = `youtube-status ${kind}`;
+  youtubeStatus.classList.remove("hidden");
+}
 
 // ---------------- Stage 1 -> 2: submit + prepare polling ----------------
 
@@ -83,14 +154,16 @@ els.jobForm.addEventListener("submit", async (e) => {
   const script = document.getElementById("script").value;
   const music = document.getElementById("music").files[0];
   const isAiVoice = voiceoverMode.value === "ai";
+  const aiQuality = document.getElementById("aiQuality").value;
 
   const fd = new FormData();
   fd.append("script", script);
+  fd.append("ai_quality", aiQuality);
   if (music) fd.append("music", music);
 
   if (isAiVoice) {
-    fd.append("voice_provider", document.getElementById("voiceProvider").value);
-    const voiceId = document.getElementById("voiceId").value.trim();
+    fd.append("voice_provider", voiceProviderSelect.value);
+    const voiceId = voicePickerSelect.value.trim();
     if (voiceId) fd.append("voice_id", voiceId);
   } else {
     const voiceover = voiceoverFileInput.files[0];

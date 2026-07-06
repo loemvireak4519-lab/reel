@@ -2,8 +2,11 @@
 Stage: "Generate AI image/video if needed"
 
 Used when a scene is tagged ai_image/ai_video by scene_splitter, or when
-footage_search finds no usable stock clip. Stability AI handles ai_image
-(fast, cheap, reliable). Runway handles ai_video (slower, polling-based).
+footage_search finds no usable stock clip. The user picks a quality tier
+that determines which model actually generates the visual:
+  - "fast"  -> Stability Core (image, cheap/quick)
+  - "high"  -> Stability Ultra (image, higher quality, slower/costlier)
+  - "video" -> Runway (actual video generation, slowest/priciest)
 
 NOTE: Runway's API surface changes between versions — this targets their
 async task-based Gen-3 style API (POST to start, GET to poll). If your
@@ -18,15 +21,19 @@ import requests
 
 from .models import Candidate
 
-STABILITY_URL = "https://api.stability.ai/v2beta/stable-image/generate/core"
+STABILITY_CORE_URL = "https://api.stability.ai/v2beta/stable-image/generate/core"
+STABILITY_ULTRA_URL = "https://api.stability.ai/v2beta/stable-image/generate/ultra"
 RUNWAY_BASE_URL = "https://api.dev.runwayml.com/v1"
 
+QUALITY_TIERS = ("fast", "high", "video")
+DEFAULT_QUALITY = "fast"
 
-def build_ai_candidate(prompt: str, visual_type: str) -> Candidate:
+
+def build_ai_candidate(prompt: str, ai_quality: str = DEFAULT_QUALITY) -> Candidate:
     """A placeholder candidate shown in the review UI for AI-sourced scenes.
     Nothing is generated yet — the review panel just shows the prompt text
     ('AI will generate: ...') until export, when the actual media is made."""
-    kind = "video" if visual_type == "ai_video" else "image"
+    kind = "video" if ai_quality == "video" else "image"
     return Candidate(
         id=f"ai_{uuid.uuid4().hex[:8]}",
         source="ai",
@@ -37,13 +44,14 @@ def build_ai_candidate(prompt: str, visual_type: str) -> Candidate:
     )
 
 
-def generate_ai_image(prompt: str, dest_path: str) -> str:
+def generate_ai_image(prompt: str, dest_path: str, tier: str = "fast") -> str:
     api_key = os.environ.get("STABILITY_API_KEY")
     if not api_key:
         raise RuntimeError("STABILITY_API_KEY is not set")
 
+    url = STABILITY_ULTRA_URL if tier == "high" else STABILITY_CORE_URL
     resp = requests.post(
-        STABILITY_URL,
+        url,
         headers={"Authorization": f"Bearer {api_key}", "Accept": "image/*"},
         files={"none": ""},
         data={"prompt": prompt, "output_format": "png", "aspect_ratio": "16:9"},
@@ -96,24 +104,24 @@ def generate_ai_video(prompt: str, dest_path: str, duration: int = 5, poll_inter
     raise TimeoutError(f"Runway generation for task {task_id} did not finish within {timeout}s")
 
 
-def generate_asset_for_scene(visual_type: str, prompt: str, dest_dir: str, scene_index: int) -> str:
+def generate_asset_for_scene(ai_quality: str, prompt: str, dest_dir: str, scene_index: int) -> str:
     os.makedirs(dest_dir, exist_ok=True)
-    if visual_type == "ai_video":
+    if ai_quality == "video":
         dest_path = os.path.join(dest_dir, f"scene_{scene_index:03d}_ai.mp4")
         return generate_ai_video(prompt, dest_path)
     else:
         dest_path = os.path.join(dest_dir, f"scene_{scene_index:03d}_ai.png")
-        return generate_ai_image(prompt, dest_path)
+        return generate_ai_image(prompt, dest_path, tier=ai_quality)
 
 
-def generate_for_candidate(candidate: Candidate, dest_dir: str, scene_index: int) -> str:
+def generate_for_candidate(candidate: Candidate, dest_dir: str, scene_index: int, ai_quality: str = DEFAULT_QUALITY) -> str:
     """Generates the actual media for an 'ai' candidate at export time and
     fills in candidate.local_path. Called only for whichever candidate the
     user has selected — never during the review phase."""
     if candidate.local_path and os.path.exists(candidate.local_path):
         return candidate.local_path
     path = generate_asset_for_scene(
-        "ai_video" if candidate.kind == "video" else "ai_image",
+        ai_quality,
         candidate.prompt or "",
         dest_dir,
         scene_index,

@@ -72,6 +72,7 @@ class Job:
     # fills it in with the generated audio's local path.
     voice_provider: Optional[str] = None   # "elevenlabs" | "google" | None
     voice_id: Optional[str] = None
+    ai_quality: str = "fast"                # "fast" | "high" | "video"
 
     def to_dict(self):
         return asdict(self)

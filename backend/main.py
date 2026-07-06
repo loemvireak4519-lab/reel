@@ -15,6 +15,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pipeline.models import Job
 from pipeline.orchestrator import prepare_pipeline, export_pipeline, STORAGE_DIR
 from pipeline.footage_search import find_candidates
+from pipeline.youtube_import import generate_script_from_youtube
+from pipeline.voices import list_voices
 
 app = FastAPI(title="Video Pipeline API")
 
@@ -76,6 +78,37 @@ def _get_job(job_id: str) -> Job:
     return job
 
 
+# ---- YouTube import: extract transcript, have Claude write an original script ----
+
+@app.post("/api/youtube/rewrite")
+async def youtube_rewrite(body: dict = Body(...)):
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url is required")
+
+    try:
+        script = generate_script_from_youtube(url)
+    except RuntimeError as e:
+        raise HTTPException(422, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    return {"script": script}
+
+
+# ---- Voice listing: real voices for the picker, not a raw ID field ----
+
+@app.get("/api/voices")
+async def get_voices(provider: str, language_code: str = "en-US"):
+    try:
+        voices = list_voices(provider, language_code=language_code)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"voices": voices}
+
+
 # ---- Prepare: upload script + voiceover, run stages up to review ----------
 
 @app.post("/api/jobs")
@@ -85,6 +118,7 @@ async def create_job(
     music: UploadFile | None = File(None),
     voice_provider: str | None = Form(None),
     voice_id: str | None = Form(None),
+    ai_quality: str = Form("fast"),
 ):
     if voiceover is None and not voice_provider:
         raise HTTPException(400, "Upload a voiceover file or choose an AI voice provider")
@@ -107,6 +141,7 @@ async def create_job(
         music_path=music_path,
         voice_provider=voice_provider,
         voice_id=voice_id,
+        ai_quality=ai_quality,
     )
     JOBS[job_id] = job
 

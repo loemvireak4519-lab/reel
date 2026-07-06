@@ -31,15 +31,39 @@
 
         <div class="field-row">
           <label class="field file-field">
-            <span class="field-label">Voiceover <em>(required)</em></span>
-            <input type="file" id="voiceover" accept="audio/*" required />
-            <span class="file-name" data-for="voiceover">No file chosen</span>
+            <span class="field-label">Voiceover source</span>
+            <select id="voiceoverMode">
+              <option value="upload">Upload my own recording</option>
+              <option value="ai">Generate with AI voice</option>
+            </select>
           </label>
 
           <label class="field file-field">
             <span class="field-label">Background music <em>(optional)</em></span>
             <input type="file" id="music" accept="audio/*" />
             <span class="file-name" data-for="music">No file chosen</span>
+          </label>
+        </div>
+
+        <div class="field-row" id="uploadVoiceoverRow">
+          <label class="field file-field">
+            <span class="field-label">Voiceover file <em>(required)</em></span>
+            <input type="file" id="voiceover" accept="audio/*" required />
+            <span class="file-name" data-for="voiceover">No file chosen</span>
+          </label>
+        </div>
+
+        <div class="field-row hidden" id="aiVoiceoverRow">
+          <label class="field file-field">
+            <span class="field-label">Voice provider</span>
+            <select id="voiceProvider">
+              <option value="elevenlabs">ElevenLabs (most natural)</option>
+              <option value="google">Google Cloud TTS (Studio voice)</option>
+            </select>
+          </label>
+          <label class="field file-field">
+            <span class="field-label">Voice ID / name <em>(optional)</em></span>
+            <input type="text" id="voiceId" placeholder="Leave blank to use a natural default voice" />
           </label>
         </div>
 

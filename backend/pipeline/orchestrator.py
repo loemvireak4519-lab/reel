@@ -8,6 +8,7 @@ from .footage_search import find_candidates, download_candidate
 from .ai_generator import build_ai_candidate, generate_for_candidate
 from .subtitles import build_srt
 from .video_assembler import assemble_video
+from .tts import generate_voiceover
 
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
 
@@ -26,6 +27,14 @@ def prepare_pipeline(job: Job, script: str) -> None:
     the review UI has something to show.
     """
     try:
+        jobdir = job_dir(job)
+
+        if not job.voiceover_path:
+            job.status, job.message, job.progress = "voiceover", f"Generating AI voiceover ({job.voice_provider})", 0.03
+            generated_path = os.path.join(jobdir, "generated_voiceover.mp3")
+            generate_voiceover(job.voice_provider, script, generated_path, voice=job.voice_id)
+            job.voiceover_path = generated_path
+
         job.status, job.message, job.progress = "splitting", "Splitting script into scenes and tagging keywords/emotion", 0.1
         job.scenes = split_script_into_scenes(script)
 

@@ -5,12 +5,24 @@ subtitled rough cut. It pauses before rendering anything so you can review
 and edit the AI's choices on a timeline first.
 
 ```
-Script → Voiceover → split into scenes → extract keywords → analyze emotion
+Script → Voiceover (upload, OR generate with ElevenLabs/Google TTS)
+→ split into scenes → extract keywords → analyze emotion
 → choose visual type → search stock footage → fill timeline → generate
 subtitles → USER REVIEWS (swap clips, retime, edit text/motion/emotion)
 → export video (fetch selected assets, AI-generate any that need it,
   mix music/SFX, render)
 ```
+
+## Voiceover: upload your own, or generate one
+
+The input form has a "Voiceover source" toggle:
+- **Upload my own recording** — the original flow, unchanged.
+- **Generate with AI voice** — no recording needed. Pick ElevenLabs (most
+  natural-sounding) or Google Cloud TTS (their Studio-tier voices), optionally
+  give a specific voice ID/name, and `pipeline/tts.py` synthesizes the
+  voiceover from the script text itself before anything else runs. From that
+  point on it's treated exactly like an uploaded recording — same Whisper
+  alignment, same timing accuracy — so nothing downstream needed to change.
 
 ## Two phases, not one pass
 
@@ -70,6 +82,8 @@ Open `http://localhost:8000` — the backend serves the frontend directly too.
 - `PEXELS_API_KEY` and/or `PIXABAY_API_KEY` — required for stock candidates
 - `STABILITY_API_KEY` — AI image fallback
 - `RUNWAY_API_KEY` — AI video fallback
+- `ELEVENLABS_API_KEY` — for AI-generated voiceover (most natural option)
+- `GOOGLE_TTS_API_KEY` — for AI-generated voiceover (Google Cloud TTS alternative)
 
 ## API reference (for the review step)
 

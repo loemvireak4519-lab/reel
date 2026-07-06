@@ -1,4 +1,5 @@
 const PREPARE_STAGES = [
+  { key: "voiceover", label: "Voice" },
   { key: "splitting", label: "Split" },
   { key: "timing", label: "Timing" },
   { key: "sourcing", label: "Footage" },
@@ -62,23 +63,47 @@ document.querySelectorAll('input[type="file"]').forEach((input) => {
   });
 });
 
+const voiceoverMode = document.getElementById("voiceoverMode");
+const uploadVoiceoverRow = document.getElementById("uploadVoiceoverRow");
+const aiVoiceoverRow = document.getElementById("aiVoiceoverRow");
+const voiceoverFileInput = document.getElementById("voiceover");
+
+voiceoverMode.addEventListener("change", () => {
+  const isAi = voiceoverMode.value === "ai";
+  uploadVoiceoverRow.classList.toggle("hidden", isAi);
+  aiVoiceoverRow.classList.toggle("hidden", !isAi);
+  voiceoverFileInput.required = !isAi;
+});
+
 // ---------------- Stage 1 -> 2: submit + prepare polling ----------------
 
 els.jobForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const script = document.getElementById("script").value;
-  const voiceover = document.getElementById("voiceover").files[0];
   const music = document.getElementById("music").files[0];
+  const isAiVoice = voiceoverMode.value === "ai";
 
   const fd = new FormData();
   fd.append("script", script);
-  fd.append("voiceover", voiceover);
   if (music) fd.append("music", music);
+
+  if (isAiVoice) {
+    fd.append("voice_provider", document.getElementById("voiceProvider").value);
+    const voiceId = document.getElementById("voiceId").value.trim();
+    if (voiceId) fd.append("voice_id", voiceId);
+  } else {
+    const voiceover = voiceoverFileInput.files[0];
+    if (!voiceover) {
+      showPrepareError("Choose a voiceover file, or switch to \"Generate with AI voice\".");
+      return;
+    }
+    fd.append("voiceover", voiceover);
+  }
 
   showPanel(els.preparePanel);
   els.prepareError.classList.add("hidden");
-  renderFilmstrip(els.prepareFilmstrip, PREPARE_STAGES, "splitting");
+  renderFilmstrip(els.prepareFilmstrip, PREPARE_STAGES, isAiVoice ? "voiceover" : "splitting");
 
   try {
     const res = await fetch("/api/jobs", { method: "POST", body: fd });

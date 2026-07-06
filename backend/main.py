@@ -81,19 +81,33 @@ def _get_job(job_id: str) -> Job:
 @app.post("/api/jobs")
 async def create_job(
     script: str = Form(...),
-    voiceover: UploadFile = File(...),
+    voiceover: UploadFile | None = File(None),
     music: UploadFile | None = File(None),
+    voice_provider: str | None = Form(None),
+    voice_id: str | None = Form(None),
 ):
+    if voiceover is None and not voice_provider:
+        raise HTTPException(400, "Upload a voiceover file or choose an AI voice provider")
+
     job_id = uuid.uuid4().hex[:12]
     jobdir = os.path.join(STORAGE_DIR, job_id)
     os.makedirs(jobdir, exist_ok=True)
 
-    voiceover_path = _save_upload(voiceover, os.path.join(jobdir, "voiceover_" + voiceover.filename))
+    voiceover_path = None
+    if voiceover is not None:
+        voiceover_path = _save_upload(voiceover, os.path.join(jobdir, "voiceover_" + voiceover.filename))
+
     music_path = None
     if music is not None:
         music_path = _save_upload(music, os.path.join(jobdir, "music_" + music.filename))
 
-    job = Job(job_id=job_id, voiceover_path=voiceover_path, music_path=music_path)
+    job = Job(
+        job_id=job_id,
+        voiceover_path=voiceover_path,
+        music_path=music_path,
+        voice_provider=voice_provider,
+        voice_id=voice_id,
+    )
     JOBS[job_id] = job
 
     threading.Thread(target=prepare_pipeline, args=(job, script), daemon=True).start()

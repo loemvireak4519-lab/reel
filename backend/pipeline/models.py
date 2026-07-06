@@ -67,6 +67,12 @@ class Job:
     output_path: Optional[str] = None
     error: Optional[str] = None
 
+    # Set when the user chooses "generate with AI voice" instead of
+    # uploading a recording. voiceover_path stays None until prepare_pipeline
+    # fills it in with the generated audio's local path.
+    voice_provider: Optional[str] = None   # "elevenlabs" | "google" | None
+    voice_id: Optional[str] = None
+
     def to_dict(self):
         return asdict(self)
 

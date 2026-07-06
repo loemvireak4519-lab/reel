@@ -113,15 +113,15 @@
           <label class="field file-field">
             <span class="field-label">Visual source</span>
             <select id="visualMode">
-              <option value="stock_or_ai" selected>Stock footage, AI as fallback</option>
-              <option value="ai_only">AI only — generate every scene, skip stock search</option>
+              <option value="stock_only" selected>Stock footage (no AI fallback)</option>
+              <option value="ai_only">AI only — generate every scene</option>
             </select>
           </label>
         </div>
 
         <div class="field-row">
           <label class="field file-field">
-            <span class="field-label" id="aiQualityLabel">AI visual generator <em>(used only when no stock footage matches)</em></span>
+            <span class="field-label" id="aiQualityLabel">AI visual generator <em>(used only in AI-only mode)</em></span>
             <select id="aiQuality">
               <option value="fast" selected>Fast — Stability Core (image, cheap &amp; quick)</option>
               <option value="high">High quality — Stability Ultra (image, slower)</option>

@@ -74,7 +74,7 @@ class Job:
     voice_id: Optional[str] = None
     elevenlabs_model: Optional[str] = None  # e.g. "eleven_multilingual_v2" — only used if voice_provider == "elevenlabs"
     ai_quality: str = "fast"                # "fast" | "high" | "video"
-    visual_mode: str = "stock_or_ai"        # "stock_or_ai" | "ai_only"
+    visual_mode: str = "stock_only"        # "stock_only" | "ai_only"
 
     def to_dict(self):
         return asdict(self)

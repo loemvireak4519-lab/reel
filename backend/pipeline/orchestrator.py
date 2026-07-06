@@ -45,6 +45,7 @@ def prepare_pipeline(job: Job, script: str) -> None:
         total = len(job.scenes)
         usage_counts: dict[str, int] = {}
         ai_only = job.visual_mode == "ai_only"
+        stock_only = job.visual_mode == "stock_only"
 
         for i, scene in enumerate(job.scenes):
             if ai_only:
@@ -52,6 +53,20 @@ def prepare_pipeline(job: Job, script: str) -> None:
                 # regardless of what scene_splitter originally suggested.
                 if scene.visual_type not in ("ai_video", "ai_image"):
                     scene.visual_type = "ai_video" if job.ai_quality == "video" else "ai_image"
+            elif stock_only:
+                # Force every scene to search stock, even ones scene_splitter
+                # originally tagged as ai_image/ai_video (abstract concepts).
+                # If nothing is found, deliberately do NOT fall back to AI —
+                # the scene is left with no selected candidate so the user
+                # has to resolve it themselves in review (e.g. a different
+                # search query) rather than silently getting an AI image.
+                scene.visual_type = "stock_footage"
+                candidates = find_candidates(scene.search_query)
+                scene.candidates = candidates
+                if candidates:
+                    chosen = min(candidates, key=lambda c: usage_counts.get(c.download_url, 0))
+                    scene.selected_candidate_id = chosen.id
+                    usage_counts[chosen.download_url] = usage_counts.get(chosen.download_url, 0) + 1
             elif scene.visual_type in ("stock_footage", "stock_image"):
                 candidates = find_candidates(scene.search_query)
                 scene.candidates = candidates
@@ -70,7 +85,7 @@ def prepare_pipeline(job: Job, script: str) -> None:
                     # nothing found in stock -> offer an AI placeholder instead
                     scene.visual_type = "ai_image"
 
-            if scene.visual_type in ("ai_video", "ai_image") and not scene.candidates:
+            if not stock_only and scene.visual_type in ("ai_video", "ai_image") and not scene.candidates:
                 ai_candidate = build_ai_candidate(scene.search_query, job.ai_quality)
                 scene.candidates = [ai_candidate]
                 scene.selected_candidate_id = ai_candidate.id

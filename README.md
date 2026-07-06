@@ -192,9 +192,11 @@ Studio/Neural2/Wavenet by name — fixed so the actual best-sounding options
 surface at the top instead of being buried at the bottom.
 
 **ElevenLabs model selector.** A separate "ElevenLabs model" dropdown appears
-once ElevenLabs is selected — Multilingual v2 (default, best for narration),
-Eleven v3 (most expressive, pricier, 3,000-char request limit), Flash v2.5
-(fastest/cheapest), Turbo v2.5. The chunking limits in `pipeline/tts.py`
+once ElevenLabs is selected, ranked by how human/natural each one actually
+sounds (not just listed by name): **Eleven v3** (most human-like, expressive
+emotion, 3,000-char request limit) → **Multilingual v2** (very natural,
+default) → **Turbo v2.5** (more AI-sounding, faster) → **Flash v2.5** (most
+AI-sounding, fastest/cheapest). The chunking limits in `pipeline/tts.py`
 (`ELEVENLABS_MODEL_MAX_CHARS`) are model-specific — Eleven v3's much smaller
 per-request limit is handled automatically for long scripts.
 
@@ -206,16 +208,25 @@ that exact model instead (a small real cost, same mechanism as Google's
 previews) — so what you hear before committing matches what export will
 actually produce.
 
-## Visual source: stock + AI fallback vs AI-only
+## Visual source: stock footage vs AI-only
 
-A "Visual source" dropdown next to the AI-quality picker lets you skip stock
-search entirely: **"Stock footage, AI as fallback"** (default — the original
-behavior) or **"AI only"** — every scene gets AI-generated regardless of
-whether a stock clip would have matched, and `pipeline/orchestrator.py`
-never calls Pexels/Pixabay at all in this mode. Picking "AI only" also
-auto-selects the "High quality" AI tier (Stability Ultra) by default, on the
-assumption that if you're generating everything with AI, quality matters
-more than the "Fast" tier's speed/cost savings — still fully overridable.
+A "Visual source" dropdown lets you pick exactly one of two behaviors —
+deliberately not the earlier hybrid, since the point is knowing which one
+you're getting:
+
+- **"Stock footage (no AI fallback)"** (default) — every scene searches
+  Pexels/Pixabay, even ones `scene_splitter` originally suggested as
+  AI-appropriate (abstract concepts). If a scene genuinely has no stock
+  match, it's left with no selected candidate rather than silently getting
+  an AI image — you resolve it yourself in review (try a different search
+  query via "Swap clip") rather than being surprised by an AI-generated
+  scene you didn't ask for.
+- **"AI only"** — every scene is AI-generated regardless of whether stock
+  footage exists for it; `pipeline/orchestrator.py` never calls
+  Pexels/Pixabay at all in this mode. Selecting this auto-switches the AI
+  tier to "High quality" (Stability Ultra) by default, since if you're
+  generating everything with AI, quality matters more than the "Fast"
+  tier's speed/cost savings — still fully overridable.
 
 ## Theme picker — starter scripts for popular niches
 

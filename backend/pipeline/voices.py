@@ -17,12 +17,13 @@ GOOGLE_VOICES_URL = "https://texttospeech.googleapis.com/v1/voices"
 PREVIEW_SAMPLE_TEXT = "Hello, this is a preview of this voice."
 
 # Shown in the frontend's ElevenLabs "Model" dropdown. Matches
-# ELEVENLABS_MODEL_MAX_CHARS in tts.py.
+# ELEVENLABS_MODEL_MAX_CHARS in tts.py. Ranked here by how human/natural
+# each one actually sounds, not just by name.
 ELEVENLABS_MODELS = [
-    {"id": "eleven_multilingual_v2", "name": "Multilingual v2", "description": "Best quality for narration (default)"},
-    {"id": "eleven_v3", "name": "Eleven v3", "description": "Most expressive/emotional, slower, pricier"},
-    {"id": "eleven_flash_v2_5", "name": "Flash v2.5", "description": "Fastest, cheapest, less nuanced"},
-    {"id": "eleven_turbo_v2_5", "name": "Turbo v2.5", "description": "Similar to Flash, slightly higher quality"},
+    {"id": "eleven_v3", "name": "Eleven v3", "description": "Most human-like — expressive emotion, slower, pricier"},
+    {"id": "eleven_multilingual_v2", "name": "Multilingual v2", "description": "Very natural, best for narration (default)"},
+    {"id": "eleven_turbo_v2_5", "name": "Turbo v2.5", "description": "Good, more AI-sounding than the above — faster"},
+    {"id": "eleven_flash_v2_5", "name": "Flash v2.5", "description": "Most AI-sounding, but fastest/cheapest"},
 ]
 
 

@@ -186,7 +186,7 @@ async def create_job(
     voice_id: str | None = Form(None),
     elevenlabs_model: str | None = Form(None),
     ai_quality: str = Form("fast"),
-    visual_mode: str = Form("stock_or_ai"),
+    visual_mode: str = Form("stock_only"),
 ):
     if voiceover is None and not voice_provider:
         raise HTTPException(400, "Upload a voiceover file or choose an AI voice provider")

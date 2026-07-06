@@ -199,7 +199,7 @@ visualModeSelect.addEventListener("change", () => {
   const isAiOnly = visualModeSelect.value === "ai_only";
   aiQualityLabel.innerHTML = isAiOnly
     ? "AI visual generator <em>(used for every scene)</em>"
-    : "AI visual generator <em>(used only when no stock footage matches)</em>";
+    : "AI visual generator <em>(used only in AI-only mode)</em>";
   if (isAiOnly) {
     // "AI only" implies quality matters more than speed/cost by default —
     // still overridable, just a sensible starting point.

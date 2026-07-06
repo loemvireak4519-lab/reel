@@ -54,30 +54,30 @@ def extract_video_id(url: str) -> str:
 
 
 def _build_transcript_api():
-    """Uses a Webshare rotating-residential proxy if configured (recommended
-    by youtube-transcript-api specifically for cloud-hosted services, since
-    YouTube blocks most datacenter IPs including Render's). Falls back to a
-    direct connection if no proxy env vars are set, which works locally but
-    will likely hit IpBlocked/RequestBlocked when running on Render."""
+    """Priority: a generic PROXY_URL (e.g. a residential/static proxy you
+    trust) first, then Webshare if configured, then no proxy at all. Direct
+    connections and most free/datacenter proxy tiers get blocked or
+    rate-limited by YouTube when run from a cloud host like Render — a
+    residential proxy IP is what actually gets past that."""
     from youtube_transcript_api import YouTubeTranscriptApi
     from youtube_transcript_api.proxies import WebshareProxyConfig, GenericProxyConfig
 
+    generic_proxy_url = os.environ.get("PROXY_URL")
     webshare_user = os.environ.get("WEBSHARE_PROXY_USERNAME")
     webshare_pass = os.environ.get("WEBSHARE_PROXY_PASSWORD")
-    generic_proxy_url = os.environ.get("PROXY_URL")
 
-    if webshare_user and webshare_pass:
-        return YouTubeTranscriptApi(
-            proxy_config=WebshareProxyConfig(
-                proxy_username=webshare_user,
-                proxy_password=webshare_pass,
-            )
-        )
     if generic_proxy_url:
         return YouTubeTranscriptApi(
             proxy_config=GenericProxyConfig(
                 http_url=generic_proxy_url,
                 https_url=generic_proxy_url,
+            )
+        )
+    if webshare_user and webshare_pass:
+        return YouTubeTranscriptApi(
+            proxy_config=WebshareProxyConfig(
+                proxy_username=webshare_user,
+                proxy_password=webshare_pass,
             )
         )
     return YouTubeTranscriptApi()

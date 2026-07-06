@@ -129,6 +129,10 @@ async def youtube_rewrite(body: dict = Body(...)):
         raise HTTPException(422, str(e))
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except Exception as e:
+        # Defense in depth: any other unexpected failure still returns clean
+        # JSON instead of a raw 500 HTML page the frontend can't parse.
+        raise HTTPException(500, f"Unexpected error: {e}")
 
     return {"script": script}
 

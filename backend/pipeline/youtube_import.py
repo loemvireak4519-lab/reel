@@ -85,6 +85,7 @@ def _build_transcript_api():
 
 def fetch_transcript_text(url: str) -> str:
     """Internal use only — never exposed directly to the frontend."""
+    import requests as requests_lib
     from youtube_transcript_api._errors import (
         TranscriptsDisabled,
         NoTranscriptFound,
@@ -110,6 +111,17 @@ def fetch_transcript_text(url: str) -> str:
             "Set WEBSHARE_PROXY_USERNAME and WEBSHARE_PROXY_PASSWORD (a cheap Webshare "
             "rotating-residential proxy plan, ~$1/month, is what youtube-transcript-api "
             "recommends specifically for this) to fix it — see the README."
+        )
+    except requests_lib.exceptions.RequestException as e:
+        # Raw network-level failure (e.g. repeated 429s exhausting urllib3's
+        # retry budget before youtube-transcript-api's own error classes ever
+        # get a chance to fire) — this happens even through a proxy if that
+        # proxy's IPs are themselves rate-limited/blocked by YouTube.
+        raise RuntimeError(
+            "Couldn't reach YouTube to fetch the transcript (network-level failure, "
+            f"likely rate-limiting): {e}. If a Webshare proxy is configured, its IPs "
+            "may themselves be rate-limited — a paid Rotating Residential plan is more "
+            "reliable for this than the free datacenter tier."
         )
 
     text = " ".join(snippet.text for snippet in fetched.snippets)

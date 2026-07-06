@@ -58,11 +58,11 @@ def _call_claude(script: str) -> list[dict]:
         },
         json={
             "model": MODEL,
-            "max_tokens": 4000,
+            "max_tokens": 16000,
             "system": SYSTEM_PROMPT,
             "messages": [{"role": "user", "content": script}],
         },
-        timeout=60,
+        timeout=180,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -78,36 +78,64 @@ def _call_claude(script: str) -> list[dict]:
         raise RuntimeError(f"Scene splitter returned non-JSON output: {e}\nRaw: {raw[:500]}")
 
 
+# A single Claude call handles roughly this many sentences comfortably within
+# the max_tokens budget above (each scene's JSON output costs ~100-150
+# tokens). Longer scripts are split into sequential chunks by sentence count
+# so a 10+ minute script (commonly 150-250+ sentences) doesn't silently
+# truncate the JSON response.
+SENTENCES_PER_CHUNK = 60
+
+
+def _split_script_into_chunks(script: str) -> list[str]:
+    sentences = re.split(r"(?<=[.!?])\s+", script.strip())
+    chunks = []
+    for i in range(0, len(sentences), SENTENCES_PER_CHUNK):
+        chunk = " ".join(sentences[i : i + SENTENCES_PER_CHUNK]).strip()
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
+
 def split_script_into_scenes(script: str) -> list[Scene]:
     """
     Splits a raw script into Scene objects with keywords/emotion/visual_type/
     search_query/motion already assigned. Timing (start/end) and candidates
     are filled in by later stages.
+
+    Long scripts (roughly anything past a few minutes of narration) are
+    processed in sequential chunks so the response never gets silently
+    truncated — each chunk still asks Claude to reconstruct that chunk's
+    text exactly, and indices are kept continuous across chunks.
     """
     script = script.strip()
     if not script:
         raise ValueError("Script is empty")
 
-    raw_scenes = _call_claude(script)
+    script_chunks = _split_script_into_chunks(script)
 
     scenes: list[Scene] = []
-    for i, item in enumerate(raw_scenes):
-        emotion = item.get("emotion", "neutral")
-        if emotion not in EMOTIONS:
-            emotion = "neutral"
+    next_index = 0
+    for chunk in script_chunks:
+        raw_scenes = _call_claude(chunk)
 
-        scenes.append(
-            Scene(
-                index=i,
-                text=item["text"].strip(),
-                keywords=[k.strip() for k in item.get("keywords", []) if k.strip()],
-                emotion=emotion,
-                visual_type=item.get("visual_type", "stock_footage"),
-                search_query=item.get("search_query", "").strip(),
-                motion=item.get("motion", "static"),
-                subtitle_text=item["text"].strip(),
+        for item in raw_scenes:
+            emotion = item.get("emotion", "neutral")
+            if emotion not in EMOTIONS:
+                emotion = "neutral"
+
+            scenes.append(
+                Scene(
+                    index=next_index,
+                    text=item["text"].strip(),
+                    keywords=[k.strip() for k in item.get("keywords", []) if k.strip()],
+                    emotion=emotion,
+                    visual_type=item.get("visual_type", "stock_footage"),
+                    search_query=item.get("search_query", "").strip(),
+                    motion=item.get("motion", "static"),
+                    subtitle_text=item["text"].strip(),
+                )
             )
-        )
+            next_index += 1
 
     if not scenes:
         raise RuntimeError("Scene splitter returned zero scenes")

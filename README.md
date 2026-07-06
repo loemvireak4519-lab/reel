@@ -124,6 +124,30 @@ alignment (Whisper), and actual stock/AI results. Drop your keys into
 `backend/.env` and run one short script through it as your first live
 smoke test.
 
+## Long videos (10+ minutes)
+
+A 10-minute script is roughly 1,300-1,500 words — enough to exceed both
+providers' per-request limits (Google Cloud TTS: 5,000 bytes; ElevenLabs:
+10,000 characters) and to risk truncating the scene-splitter's JSON output
+if it's asked to handle the whole script in one Claude call. Both are
+handled automatically:
+
+- `pipeline/tts.py` splits long text into provider-safe chunks on sentence
+  boundaries, generates each chunk separately, and concatenates the audio
+  with ffmpeg into one continuous voiceover file.
+- `pipeline/scene_splitter.py` splits very long scripts into ~60-sentence
+  chunks, calls Claude per chunk, and keeps scene indices continuous across
+  chunks — so a 100+ scene video comes back as one coherent timeline, not
+  several disconnected ones.
+
+Practical expectations for a 10+ minute video: expect 60-100+ scenes, so the
+prepare phase (scene splitting → timing → footage search) takes noticeably
+longer than a short clip since it's doing that many stock-footage searches.
+The review timeline will be a long scrollable list — nothing new is needed
+there, it's the same per-scene cards, just more of them. Export time scales
+with scene count too, since each scene gets its own short ffmpeg render
+before they're concatenated.
+
 ## Deploying this as a hosted website
 
 This needs a real, always-on process — ffmpeg renders take real wall-clock

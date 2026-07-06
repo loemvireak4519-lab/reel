@@ -136,6 +136,19 @@ internal reference material for that one rewrite call. This keeps the
 feature on the "inspired by the style" side of the line rather than
 producing a reskinned copy of someone else's work.
 
+**This was tested against a real failure and caught it.** An early version
+of this feature was tested against a well-known song and produced a rewrite
+that mimicked the chorus's repeated hook line with words swapped ("never
+gonna give you up" → "never gonna walk away") — recognizably the same thing
+despite different wording. The prompt alone didn't reliably prevent this, so
+there's now a backend safety check independent of the prompt:
+`_has_repeated_hook()` in `pipeline/youtube_import.py` detects when an
+output repeats the same opening phrase across multiple lines (the actual
+structural signature of a chorus/hook, which matters more than exact word
+choice), plus a separate n-gram check for verbatim phrase reuse. Either one
+failing triggers one retry with a blunter instruction; if it fails again,
+the request errors out instead of silently returning a risky result.
+
 **This needs a proxy to actually work when hosted on Render (or any cloud
 platform).** YouTube blocks transcript requests from most datacenter IPs,
 including Render's — this isn't a code bug, it's YouTube's own IP-blocking,
@@ -147,6 +160,9 @@ for this exact problem), then set two more env vars on Render:
 needed — `pipeline/youtube_import.py` picks them up automatically. Without
 a proxy configured, this feature works when run locally (your home IP isn't
 blocked) but will fail on Render with a clear error message telling you why.
+A `PROXY_URL` env var (any standard `http://user:pass@host:port` proxy, from
+any provider) takes priority over Webshare if you'd rather use a different
+service — a residential IP (not datacenter) is what actually matters here.
 
 ## Choosing an AI visual generator and a real voice
 

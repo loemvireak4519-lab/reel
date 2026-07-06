@@ -19,26 +19,29 @@ ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-sonnet-4-6"
 
 REWRITE_SYSTEM_PROMPT = """You are a scriptwriting assistant. You will be given a transcript \
-of a YouTube video, provided only as reference material for its STYLE.
+of a YouTube video, provided only as reference material to understand its general register \
+(e.g. energetic vs. calm, formal vs. casual, comedic vs. serious) and overall topic area.
 
-Your job: write a brand-new, original narration script that captures the same
-tone, pacing, energy, structure, and rhetorical style as the reference —
-but is otherwise a completely different, original piece of writing.
+Your job: write a brand-new, original narration script for a different video. It should be \
+recognizably different content that merely shares a similar energy level and formality — \
+NOT a retelling, reskinning, or parallel version of the reference.
 
-Hard rules:
-- Do NOT reuse any sentence, distinctive phrase, or line from the reference
-  transcript. Every sentence in your output must be your own original wording.
-- Do NOT reuse specific character names, brand names, or proper nouns from
-  the reference. Invent new ones if the content involves any named entities.
-- Do NOT reuse the specific facts, plot points, or subject matter of the
-  reference if it's a story, review, or opinion piece — change the actual
-  content/topic/characters while keeping the *shape* (pacing, structure,
-  humor style, sentence rhythm, level of formality, narrative arc) the same.
-- The output should read as clearly original work a viewer would not
-  recognize as sourced from the reference, while "feeling" stylistically
-  similar to someone who knows both.
+Critical rules — violating any of these makes the output unusable:
+- If the reference is song lyrics or has a sung/rhyming chorus: your output must be **plain \
+  prose narration, never verse, never rhyming, never a chorus/hook structure**. Do not mimic \
+  meter, rhyme scheme, or a repeated hook line under any circumstances — a paraphrased chorus \
+  ("never gonna X" -> "never gonna Y") is exactly the kind of close copy this prohibits, even \
+  with every word changed.
+- Do not mirror sentence-by-sentence or line-by-line structure at all. Do not produce a version \
+  where each line of your output has an obvious 1:1 correspondence to a line in the reference.
+- Do not reuse any distinctive phrase, hook, refrain, or repeated line pattern from the reference.
+- Do not reuse character names, brand names, proper nouns, or the specific subject matter/plot \
+  from the reference — pick a genuinely different topic in a similar register instead.
+- Before finalizing, check your own output: if a person who knows the reference would recognize \
+  it as "the same thing with words swapped," rewrite it more freely until they would not.
 
-Return ONLY the new script text, no preamble, no explanation, no markdown.
+Return ONLY the new script text as plain prose, no preamble, no explanation, no markdown, no \
+line breaks that mimic verse structure.
 """
 
 
@@ -128,6 +131,45 @@ def fetch_transcript_text(url: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _word_ngrams(text: str, n: int = 4) -> set[tuple[str, ...]]:
+    words = re.findall(r"[a-z']+", text.lower())
+    return {tuple(words[i : i + n]) for i in range(len(words) - n + 1)}
+
+
+def _similarity_ratio(a: str, b: str, n: int = 4) -> float:
+    """Rough measure of verbatim phrase reuse via shared word n-grams."""
+    ngrams_a = _word_ngrams(a, n)
+    ngrams_b = _word_ngrams(b, n)
+    if not ngrams_b:
+        return 0.0
+    shared = ngrams_a & ngrams_b
+    return len(shared) / len(ngrams_b)
+
+
+def _has_repeated_hook(text: str, prefix_len: int = 2, min_repeats: int = 3) -> bool:
+    """Detects a repeated opening phrase across multiple lines/sentences —
+    the actual telltale structural signature of a song chorus or strong
+    anaphora ("Never gonna X... never gonna Y... never gonna Z..."). This
+    matters more than exact word reuse: a listener recognizes a derivative
+    by this repetition pattern even when every word has been swapped, which
+    is exactly what a plain word-overlap check misses."""
+    lines = re.split(r"[.!?\n]+", text.lower())
+    prefixes = []
+    for line in lines:
+        words = re.findall(r"[a-z']+", line)
+        if len(words) >= prefix_len:
+            prefixes.append(tuple(words[:prefix_len]))
+
+    if not prefixes:
+        return False
+
+    counts: dict[tuple[str, ...], int] = {}
+    for p in prefixes:
+        counts[p] = counts.get(p, 0) + 1
+
+    return max(counts.values(), default=0) >= min_repeats
+
+
 def rewrite_transcript_as_original_script(transcript_text: str) -> str:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -137,25 +179,53 @@ def rewrite_transcript_as_original_script(transcript_text: str) -> str:
     # blow the context window; the style is usually clear well before this.
     reference = transcript_text[:20000]
 
-    resp = requests.post(
-        ANTHROPIC_API_URL,
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        json={
-            "model": MODEL,
-            "max_tokens": 8000,
-            "system": REWRITE_SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": reference}],
-        },
-        timeout=180,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    text_blocks = [b["text"] for b in data.get("content", []) if b.get("type") == "text"]
-    return "".join(text_blocks).strip()
+    def _call_claude(extra_instruction: str = "") -> str:
+        system = REWRITE_SYSTEM_PROMPT + extra_instruction
+        resp = requests.post(
+            ANTHROPIC_API_URL,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": MODEL,
+                "max_tokens": 8000,
+                "system": system,
+                "messages": [{"role": "user", "content": reference}],
+            },
+            timeout=180,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text_blocks = [b["text"] for b in data.get("content", []) if b.get("type") == "text"]
+        return "".join(text_blocks).strip()
+
+    result = _call_claude()
+    similarity = _similarity_ratio(reference, result)
+    risky_structure = _has_repeated_hook(result)
+
+    # First attempt failed either check — retry once with a blunt, explicit
+    # instruction rather than silently shipping a risky result.
+    if similarity > 0.15 or risky_structure:
+        result = _call_claude(
+            "\n\nYour previous attempt was rejected: it either reused source phrasing, or it "
+            "used a repeated opening hook/refrain across multiple lines (a chorus-like pattern), "
+            "which is unsafe even with different words. Write plain, varied prose with NO "
+            "repeated line-opening phrase anywhere, and no wording shared with the source."
+        )
+        similarity = _similarity_ratio(reference, result)
+        risky_structure = _has_repeated_hook(result)
+
+    if similarity > 0.15 or risky_structure:
+        raise RuntimeError(
+            "Could not generate a sufficiently original rewrite of this video after two "
+            "attempts — the source material may be too distinctive (e.g. song lyrics with a "
+            "very recognizable hook) to safely rewrite automatically. Try a different video, "
+            "or write your script from scratch."
+        )
+
+    return result
 
 
 def generate_script_from_youtube(url: str) -> str:

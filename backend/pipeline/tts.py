@@ -26,11 +26,15 @@ GOOGLE_TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
 DEFAULT_ELEVENLABS_VOICE = "21m00Tcm4TlvDq8ikWAM"  # "Rachel" - warm, neutral narration voice
 DEFAULT_GOOGLE_VOICE = "en-US-Studio-O"            # Google's Studio tier - their most natural voice
 
-# Kept comfortably under each provider's hard limit (ElevenLabs: 10,000 chars
-# for eleven_multilingual_v2; Google: 5,000 *bytes*, not characters, for the
-# synchronous synthesize endpoint) so multi-byte characters don't tip a chunk
-# over the edge.
-ELEVENLABS_MAX_CHARS = 9000
+# Kept comfortably under each provider's hard limit so multi-byte characters
+# don't tip a chunk over the edge. ElevenLabs' limit varies by model.
+ELEVENLABS_MODEL_MAX_CHARS = {
+    "eleven_multilingual_v2": 9000,   # hard limit 10,000
+    "eleven_flash_v2_5": 38000,       # hard limit 40,000
+    "eleven_turbo_v2_5": 38000,       # hard limit 40,000
+    "eleven_v3": 2800,                # hard limit 3,000
+}
+DEFAULT_ELEVENLABS_MODEL = "eleven_multilingual_v2"
 GOOGLE_MAX_CHARS = 4500
 
 
@@ -85,7 +89,7 @@ def _concat_audio(paths: list[str], dest_path: str) -> str:
     return dest_path
 
 
-def _call_elevenlabs(text: str, api_key: str, voice_id: str, dest_path: str) -> str:
+def _call_elevenlabs(text: str, api_key: str, voice_id: str, model_id: str, dest_path: str) -> str:
     resp = requests.post(
         ELEVENLABS_TTS_URL.format(voice_id=voice_id),
         headers={
@@ -95,7 +99,7 @@ def _call_elevenlabs(text: str, api_key: str, voice_id: str, dest_path: str) -> 
         },
         json={
             "text": text,
-            "model_id": "eleven_multilingual_v2",
+            "model_id": model_id,
             "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
         },
         timeout=120,
@@ -123,21 +127,25 @@ def _call_google(text: str, api_key: str, voice_name: str, language_code: str, d
     return dest_path
 
 
-def generate_elevenlabs_voiceover(text: str, dest_path: str, voice_id: str | None = None) -> str:
+def generate_elevenlabs_voiceover(
+    text: str, dest_path: str, voice_id: str | None = None, model_id: str | None = None
+) -> str:
     api_key = os.environ.get("ELEVENLABS_API_KEY")
     if not api_key:
         raise RuntimeError("ELEVENLABS_API_KEY is not set")
     voice_id = voice_id or DEFAULT_ELEVENLABS_VOICE
+    model_id = model_id or DEFAULT_ELEVENLABS_MODEL
+    max_chars = ELEVENLABS_MODEL_MAX_CHARS.get(model_id, 9000)
 
-    chunks = _split_into_chunks(text, ELEVENLABS_MAX_CHARS)
+    chunks = _split_into_chunks(text, max_chars)
     if len(chunks) == 1:
-        return _call_elevenlabs(chunks[0], api_key, voice_id, dest_path)
+        return _call_elevenlabs(chunks[0], api_key, voice_id, model_id, dest_path)
 
     workdir = tempfile.mkdtemp(prefix="tts_chunks_")
     part_paths = []
     for i, chunk in enumerate(chunks):
         part_path = os.path.join(workdir, f"part_{i:03d}.mp3")
-        _call_elevenlabs(chunk, api_key, voice_id, part_path)
+        _call_elevenlabs(chunk, api_key, voice_id, model_id, part_path)
         part_paths.append(part_path)
 
     return _concat_audio(part_paths, dest_path)
@@ -165,9 +173,9 @@ def generate_google_voiceover(
     return _concat_audio(part_paths, dest_path)
 
 
-def generate_voiceover(provider: str, text: str, dest_path: str, voice: str | None = None) -> str:
+def generate_voiceover(provider: str, text: str, dest_path: str, voice: str | None = None, model: str | None = None) -> str:
     if provider == "elevenlabs":
-        return generate_elevenlabs_voiceover(text, dest_path, voice_id=voice)
+        return generate_elevenlabs_voiceover(text, dest_path, voice_id=voice, model_id=model)
     elif provider == "google":
         return generate_google_voiceover(text, dest_path, voice_name=voice)
     raise ValueError(f"Unknown TTS provider: {provider!r} (expected 'elevenlabs' or 'google')")

@@ -16,6 +16,15 @@ GOOGLE_VOICES_URL = "https://texttospeech.googleapis.com/v1/voices"
 
 PREVIEW_SAMPLE_TEXT = "Hello, this is a preview of this voice."
 
+# Shown in the frontend's ElevenLabs "Model" dropdown. Matches
+# ELEVENLABS_MODEL_MAX_CHARS in tts.py.
+ELEVENLABS_MODELS = [
+    {"id": "eleven_multilingual_v2", "name": "Multilingual v2", "description": "Best quality for narration (default)"},
+    {"id": "eleven_v3", "name": "Eleven v3", "description": "Most expressive/emotional, slower, pricier"},
+    {"id": "eleven_flash_v2_5", "name": "Flash v2.5", "description": "Fastest, cheapest, less nuanced"},
+    {"id": "eleven_turbo_v2_5", "name": "Turbo v2.5", "description": "Similar to Flash, slightly higher quality"},
+]
+
 
 def list_elevenlabs_voices() -> list[dict]:
     api_key = os.environ.get("ELEVENLABS_API_KEY")
@@ -100,14 +109,16 @@ def list_voices(provider: str, language_code: str = "en-US") -> list[dict]:
     raise ValueError(f"Unknown TTS provider: {provider!r}")
 
 
-def generate_preview_sample(provider: str, voice_id: str, dest_path: str) -> str:
-    """Only used for providers without a free pre-recorded preview (Google).
-    ElevenLabs previews should just use the preview_url directly instead —
-    calling this for ElevenLabs would waste a real API call unnecessarily."""
+def generate_preview_sample(provider: str, voice_id: str, dest_path: str, model_id: str | None = None) -> str:
+    """Used whenever an accurate, model-specific preview is needed:
+    - Google always needs this (no free pre-recorded preview exists).
+    - ElevenLabs needs this only when previewing a non-default model —
+      the free preview_url from /api/voices is recorded with ElevenLabs'
+      own default model and won't reflect a different model's actual sound."""
     from .tts import generate_google_voiceover, generate_elevenlabs_voiceover
 
     if provider == "google":
         return generate_google_voiceover(PREVIEW_SAMPLE_TEXT, dest_path, voice_name=voice_id)
     elif provider == "elevenlabs":
-        return generate_elevenlabs_voiceover(PREVIEW_SAMPLE_TEXT, dest_path, voice_id=voice_id)
+        return generate_elevenlabs_voiceover(PREVIEW_SAMPLE_TEXT, dest_path, voice_id=voice_id, model_id=model_id)
     raise ValueError(f"Unknown TTS provider: {provider!r}")

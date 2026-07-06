@@ -100,9 +100,28 @@
           </label>
         </div>
 
+        <div class="field-row hidden" id="elevenlabsModelRow">
+          <label class="field file-field">
+            <span class="field-label">ElevenLabs model</span>
+            <select id="elevenlabsModel">
+              <option value="">Loading models…</option>
+            </select>
+          </label>
+        </div>
+
         <div class="field-row">
           <label class="field file-field">
-            <span class="field-label">AI visual generator <em>(used only when no stock footage matches)</em></span>
+            <span class="field-label">Visual source</span>
+            <select id="visualMode">
+              <option value="stock_or_ai" selected>Stock footage, AI as fallback</option>
+              <option value="ai_only">AI only — generate every scene, skip stock search</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field file-field">
+            <span class="field-label" id="aiQualityLabel">AI visual generator <em>(used only when no stock footage matches)</em></span>
             <select id="aiQuality">
               <option value="fast" selected>Fast — Stability Core (image, cheap &amp; quick)</option>
               <option value="high">High quality — Stability Ultra (image, slower)</option>

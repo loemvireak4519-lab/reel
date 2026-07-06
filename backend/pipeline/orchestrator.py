@@ -32,7 +32,7 @@ def prepare_pipeline(job: Job, script: str) -> None:
         if not job.voiceover_path:
             job.status, job.message, job.progress = "voiceover", f"Generating AI voiceover ({job.voice_provider})", 0.03
             generated_path = os.path.join(jobdir, "generated_voiceover.mp3")
-            generate_voiceover(job.voice_provider, script, generated_path, voice=job.voice_id)
+            generate_voiceover(job.voice_provider, script, generated_path, voice=job.voice_id, model=job.elevenlabs_model)
             job.voiceover_path = generated_path
 
         job.status, job.message, job.progress = "splitting", "Splitting script into scenes and tagging keywords/emotion", 0.1
@@ -44,9 +44,15 @@ def prepare_pipeline(job: Job, script: str) -> None:
         job.status, job.message, job.progress = "sourcing", "Searching stock footage candidates", 0.45
         total = len(job.scenes)
         usage_counts: dict[str, int] = {}
+        ai_only = job.visual_mode == "ai_only"
 
         for i, scene in enumerate(job.scenes):
-            if scene.visual_type in ("stock_footage", "stock_image"):
+            if ai_only:
+                # Skip stock search entirely — every scene gets AI-generated,
+                # regardless of what scene_splitter originally suggested.
+                if scene.visual_type not in ("ai_video", "ai_image"):
+                    scene.visual_type = "ai_video" if job.ai_quality == "video" else "ai_image"
+            elif scene.visual_type in ("stock_footage", "stock_image"):
                 candidates = find_candidates(scene.search_query)
                 scene.candidates = candidates
                 if candidates:

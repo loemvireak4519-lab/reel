@@ -69,29 +69,55 @@ const aiVoiceoverRow = document.getElementById("aiVoiceoverRow");
 const voiceoverFileInput = document.getElementById("voiceover");
 const voiceProviderSelect = document.getElementById("voiceProvider");
 const voicePickerSelect = document.getElementById("voicePicker");
-
-voiceoverMode.addEventListener("change", () => {
-  const isAi = voiceoverMode.value === "ai";
-  uploadVoiceoverRow.classList.toggle("hidden", isAi);
-  aiVoiceoverRow.classList.toggle("hidden", !isAi);
-  voiceoverFileInput.required = !isAi;
-  if (isAi) loadVoiceList();
-});
-
+const elevenlabsModelRow = document.getElementById("elevenlabsModelRow");
+const elevenlabsModelSelect = document.getElementById("elevenlabsModel");
 const voicePreviewBtn = document.getElementById("voicePreviewBtn");
 const voicePreviewAudio = document.getElementById("voicePreviewAudio");
 let currentVoices = [];
+let elevenlabsModelsLoaded = false;
 
 voiceoverMode.addEventListener("change", () => {
   const isAi = voiceoverMode.value === "ai";
   uploadVoiceoverRow.classList.toggle("hidden", isAi);
   aiVoiceoverRow.classList.toggle("hidden", !isAi);
   voiceoverFileInput.required = !isAi;
-  if (isAi) loadVoiceList();
+  if (isAi) {
+    loadVoiceList();
+    toggleElevenlabsModelRow();
+  }
 });
 
-voiceProviderSelect.addEventListener("change", loadVoiceList);
+voiceProviderSelect.addEventListener("change", () => {
+  loadVoiceList();
+  toggleElevenlabsModelRow();
+});
 voicePickerSelect.addEventListener("change", updatePreviewButtonState);
+elevenlabsModelSelect.addEventListener("change", updatePreviewButtonState);
+
+function toggleElevenlabsModelRow() {
+  const isElevenlabs = voiceProviderSelect.value === "elevenlabs";
+  elevenlabsModelRow.classList.toggle("hidden", !isElevenlabs);
+  if (isElevenlabs && !elevenlabsModelsLoaded) loadElevenlabsModels();
+}
+
+async function loadElevenlabsModels() {
+  try {
+    const res = await fetch("/api/voices/models");
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    elevenlabsModelSelect.innerHTML = "";
+    (data.models || []).forEach((model) => {
+      const opt = document.createElement("option");
+      opt.value = model.id;
+      opt.textContent = `${model.name} — ${model.description}`;
+      elevenlabsModelSelect.appendChild(opt);
+    });
+    elevenlabsModelsLoaded = true;
+  } catch (err) {
+    elevenlabsModelSelect.innerHTML = '<option value="">Could not load models — using default</option>';
+    console.error("failed to load ElevenLabs models", err);
+  }
+}
 
 async function loadVoiceList() {
   voicePickerSelect.innerHTML = '<option value="">Loading voices…</option>';
@@ -131,20 +157,25 @@ voicePreviewBtn.addEventListener("click", async () => {
   if (!selected) return;
 
   const provider = voiceProviderSelect.value;
+  const model = provider === "elevenlabs" ? elevenlabsModelSelect.value : null;
+  const isDefaultModel = !model || model === "eleven_multilingual_v2";
   const originalLabel = voicePreviewBtn.textContent;
 
-  if (provider === "elevenlabs" && selected.preview_url) {
-    // Free, pre-recorded sample — just play it directly.
+  if (provider === "elevenlabs" && selected.preview_url && isDefaultModel) {
+    // Free, pre-recorded sample, and it's the default model — just play it.
     voicePreviewAudio.src = selected.preview_url;
     voicePreviewAudio.play();
     return;
   }
 
-  // Google has no free preview — generate a short sample on demand (small real cost).
+  // Either Google (no free preview exists) or a non-default ElevenLabs model
+  // (the free preview_url wouldn't reflect that model's actual sound) —
+  // generate an accurate short sample on demand (small real cost).
   voicePreviewBtn.disabled = true;
   voicePreviewBtn.textContent = "Generating…";
   try {
-    const url = `/api/voices/preview?provider=${provider}&voice_id=${encodeURIComponent(selected.id)}`;
+    let url = `/api/voices/preview?provider=${provider}&voice_id=${encodeURIComponent(selected.id)}`;
+    if (model) url += `&model_id=${encodeURIComponent(model)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(await res.text());
     const blob = await res.blob();
@@ -155,6 +186,24 @@ voicePreviewBtn.addEventListener("click", async () => {
   } finally {
     voicePreviewBtn.disabled = false;
     voicePreviewBtn.textContent = originalLabel;
+  }
+});
+
+// ---------------- Visual source: stock+AI fallback vs AI-only ----------------
+
+const visualModeSelect = document.getElementById("visualMode");
+const aiQualitySelect = document.getElementById("aiQuality");
+const aiQualityLabel = document.getElementById("aiQualityLabel");
+
+visualModeSelect.addEventListener("change", () => {
+  const isAiOnly = visualModeSelect.value === "ai_only";
+  aiQualityLabel.innerHTML = isAiOnly
+    ? "AI visual generator <em>(used for every scene)</em>"
+    : "AI visual generator <em>(used only when no stock footage matches)</em>";
+  if (isAiOnly) {
+    // "AI only" implies quality matters more than speed/cost by default —
+    // still overridable, just a sensible starting point.
+    aiQualitySelect.value = "high";
   }
 });
 
@@ -236,16 +285,22 @@ els.jobForm.addEventListener("submit", async (e) => {
   const music = document.getElementById("music").files[0];
   const isAiVoice = voiceoverMode.value === "ai";
   const aiQuality = document.getElementById("aiQuality").value;
+  const visualMode = visualModeSelect.value;
 
   const fd = new FormData();
   fd.append("script", script);
   fd.append("ai_quality", aiQuality);
+  fd.append("visual_mode", visualMode);
   if (music) fd.append("music", music);
 
   if (isAiVoice) {
     fd.append("voice_provider", voiceProviderSelect.value);
     const voiceId = voicePickerSelect.value.trim();
     if (voiceId) fd.append("voice_id", voiceId);
+    if (voiceProviderSelect.value === "elevenlabs") {
+      const model = elevenlabsModelSelect.value.trim();
+      if (model) fd.append("elevenlabs_model", model);
+    }
   } else {
     const voiceover = voiceoverFileInput.files[0];
     if (!voiceover) {

@@ -151,18 +151,22 @@ async def get_voices(provider: str, language_code: str = "en-US"):
     return {"voices": voices}
 
 
-@app.get("/api/voices/preview")
-async def voice_preview(provider: str, voice_id: str):
-    """Generates a short on-demand sample for providers without a free
-    pre-recorded preview (i.e. Google — ElevenLabs previews should use the
-    preview_url from /api/voices directly instead, which costs nothing)."""
-    if provider == "elevenlabs":
-        raise HTTPException(400, "ElevenLabs previews should use the preview_url from /api/voices directly")
+@app.get("/api/voices/models")
+async def get_elevenlabs_models():
+    from pipeline.voices import ELEVENLABS_MODELS
+    return {"models": ELEVENLABS_MODELS}
 
+
+@app.get("/api/voices/preview")
+async def voice_preview(provider: str, voice_id: str, model_id: str | None = None):
+    """Generates a short on-demand sample. Always needed for Google (no free
+    preview exists). For ElevenLabs, only needed when previewing a
+    non-default model — the free preview_url from /api/voices is good
+    enough when the default model is selected."""
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
         tmp_path = tmp.name
     try:
-        generate_preview_sample(provider, voice_id, tmp_path)
+        generate_preview_sample(provider, voice_id, tmp_path, model_id=model_id)
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     except ValueError as e:
@@ -180,7 +184,9 @@ async def create_job(
     music: UploadFile | None = File(None),
     voice_provider: str | None = Form(None),
     voice_id: str | None = Form(None),
+    elevenlabs_model: str | None = Form(None),
     ai_quality: str = Form("fast"),
+    visual_mode: str = Form("stock_or_ai"),
 ):
     if voiceover is None and not voice_provider:
         raise HTTPException(400, "Upload a voiceover file or choose an AI voice provider")
@@ -203,7 +209,9 @@ async def create_job(
         music_path=music_path,
         voice_provider=voice_provider,
         voice_id=voice_id,
+        elevenlabs_model=elevenlabs_model,
         ai_quality=ai_quality,
+        visual_mode=visual_mode,
     )
     JOBS[job_id] = job
 

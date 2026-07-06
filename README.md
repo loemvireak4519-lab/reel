@@ -191,6 +191,32 @@ mislabeled as "Standard" quality since the code only recognized
 Studio/Neural2/Wavenet by name — fixed so the actual best-sounding options
 surface at the top instead of being buried at the bottom.
 
+**ElevenLabs model selector.** A separate "ElevenLabs model" dropdown appears
+once ElevenLabs is selected — Multilingual v2 (default, best for narration),
+Eleven v3 (most expressive, pricier, 3,000-char request limit), Flash v2.5
+(fastest/cheapest), Turbo v2.5. The chunking limits in `pipeline/tts.py`
+(`ELEVENLABS_MODEL_MAX_CHARS`) are model-specific — Eleven v3's much smaller
+per-request limit is handled automatically for long scripts.
+
+**Accurate model-specific previews.** ElevenLabs' free `preview_url` is
+recorded with their own default model, so it only reflects the *voice*, not
+whichever model you've actually selected. Picking a non-default model (Eleven
+v3, Flash, Turbo) makes the preview button generate a real short sample with
+that exact model instead (a small real cost, same mechanism as Google's
+previews) — so what you hear before committing matches what export will
+actually produce.
+
+## Visual source: stock + AI fallback vs AI-only
+
+A "Visual source" dropdown next to the AI-quality picker lets you skip stock
+search entirely: **"Stock footage, AI as fallback"** (default — the original
+behavior) or **"AI only"** — every scene gets AI-generated regardless of
+whether a stock clip would have matched, and `pipeline/orchestrator.py`
+never calls Pexels/Pixabay at all in this mode. Picking "AI only" also
+auto-selects the "High quality" AI tier (Stability Ultra) by default, on the
+assumption that if you're generating everything with AI, quality matters
+more than the "Fast" tier's speed/cost savings — still fully overridable.
+
 ## Theme picker — starter scripts for popular niches
 
 A "Theme" dropdown sits above the Script box with 10 of the strongest niches

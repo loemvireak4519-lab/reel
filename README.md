@@ -264,6 +264,16 @@ the same Dockerfile.
 
 ## Known limitations / next steps
 
+- **Repeated stock footage was a real bug, now fixed.** Scenes with similar
+  keywords often get the same top result from Pexels/Pixabay — the code used
+  to always pick each scene's #1 candidate, so several scenes in a row could
+  end up with the identical clip. `prepare_pipeline` in
+  `pipeline/orchestrator.py` now tracks how many times each underlying clip
+  has been used across the whole job and picks whichever available option
+  has been used least, so repeats (when genuinely unavoidable, e.g. 6 scenes
+  sharing only 3 unique search results) spread out evenly instead of
+  clustering on one clip.
+
 - **Runway's API surface shifts between versions.** `ai_generator.py` targets
   their async text-to-video task API — adjust `RUNWAY_BASE_URL` and the
   request/response shape if your account differs; nothing downstream needs

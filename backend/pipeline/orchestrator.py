@@ -43,12 +43,23 @@ def prepare_pipeline(job: Job, script: str) -> None:
 
         job.status, job.message, job.progress = "sourcing", "Searching stock footage candidates", 0.45
         total = len(job.scenes)
+        usage_counts: dict[str, int] = {}
+
         for i, scene in enumerate(job.scenes):
             if scene.visual_type in ("stock_footage", "stock_image"):
                 candidates = find_candidates(scene.search_query)
                 scene.candidates = candidates
                 if candidates:
-                    scene.selected_candidate_id = candidates[0].id
+                    # Prefer whichever candidate has been used least often so
+                    # far across the job — search results for similar
+                    # keywords often return the same top clip repeatedly,
+                    # which otherwise shows up as the same scene playing over
+                    # and over in the final video. Once every option has been
+                    # used at least once, this spreads further reuse out
+                    # evenly instead of always falling back to the same clip.
+                    chosen = min(candidates, key=lambda c: usage_counts.get(c.download_url, 0))
+                    scene.selected_candidate_id = chosen.id
+                    usage_counts[chosen.download_url] = usage_counts.get(chosen.download_url, 0) + 1
                 else:
                     # nothing found in stock -> offer an AI placeholder instead
                     scene.visual_type = "ai_image"

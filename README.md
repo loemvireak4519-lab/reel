@@ -1,0 +1,175 @@
+# Reel — script to video, with a review step
+
+A self-hosted web app that turns a script + your recorded voiceover into a
+subtitled rough cut. It pauses before rendering anything so you can review
+and edit the AI's choices on a timeline first.
+
+```
+Script → Voiceover → split into scenes → extract keywords → analyze emotion
+→ choose visual type → search stock footage → fill timeline → generate
+subtitles → USER REVIEWS (swap clips, retime, edit text/motion/emotion)
+→ export video (fetch selected assets, AI-generate any that need it,
+  mix music/SFX, render)
+```
+
+## Two phases, not one pass
+
+The earlier version of this tool ran start to finish and handed you a
+finished file. This version splits at the review step:
+
+**Prepare** (`pipeline/orchestrator.py: prepare_pipeline`) — runs scene
+splitting, keyword/emotion tagging, voice-timing, and stock footage search.
+Crucially, footage search returns *several candidates per scene* with only
+remote thumbnail URLs (no downloads, no AI generation, no cost) — enough for
+the review UI to show options. Job status lands on `ready_for_review`.
+
+**Review** (frontend, backed by `PATCH /api/jobs/{id}/scenes/{i}` and
+`POST /api/jobs/{id}/scenes/{i}/search`) — you edit subtitle text, motion,
+emotion, start/end time, or swap in a different candidate (from the ones
+already fetched, or by searching again with your own query). Every edit
+saves immediately; nothing renders yet.
+
+**Export** (`pipeline/orchestrator.py: export_pipeline`, triggered by
+`POST /api/jobs/{id}/export`) — only now does it download the actual media
+for whichever candidate is selected per scene (or run Runway/Stability if
+that candidate is AI-sourced), rebuild the subtitle file from your edited
+text, and render with ffmpeg: motion → concat → burned-in subtitles →
+music/SFX mix → final mux.
+
+## File map
+
+| Stage | File |
+|---|---|
+| Split / keywords / emotion / visual type | `pipeline/scene_splitter.py` — one Claude call returns all of these per scene |
+| Voice timing | `pipeline/voice_align.py` — Whisper word-timestamps aligned to scene text |
+| Stock footage candidates | `pipeline/footage_search.py` — Pexels + Pixabay, returns multiple options with thumbnails, downloads only on selection |
+| AI generation | `pipeline/ai_generator.py` — Stability (images) / Runway (video), only called at export for AI-selected candidates |
+| Subtitles | `pipeline/subtitles.py` — builds `.srt` from (possibly edited) scene text/timing |
+| Motion, concat, mixing, export | `pipeline/video_assembler.py` — all ffmpeg |
+| Orchestration | `pipeline/orchestrator.py` — `prepare_pipeline` and `export_pipeline` |
+| API | `main.py` — job creation, polling, scene PATCH/search, export trigger, download |
+| Review timeline UI | `frontend/index.html` + `app.js` + `style.css` |
+
+## Setup
+
+**Requirements:** Python 3.11+, `ffmpeg` on your PATH.
+
+```bash
+cd backend
+pip install -r requirements.txt
+cp .env.example .env   # fill in your API keys
+uvicorn main:app --reload --port 8000
+```
+
+Open `http://localhost:8000` — the backend serves the frontend directly too.
+
+### API keys
+
+- `ANTHROPIC_API_KEY` — required, scene splitting/keywords/emotion
+- `OPENAI_API_KEY` — required, voice-timing alignment (Whisper)
+- `PEXELS_API_KEY` and/or `PIXABAY_API_KEY` — required for stock candidates
+- `STABILITY_API_KEY` — AI image fallback
+- `RUNWAY_API_KEY` — AI video fallback
+
+## API reference (for the review step)
+
+```
+POST /api/jobs                              multipart: script, voiceover, music?
+  -> { job_id }
+
+GET  /api/jobs/{id}
+  -> full job state, including scenes[].candidates for the review UI
+
+PATCH /api/jobs/{id}/scenes/{index}          json body, any subset of:
+  { subtitle_text, motion, emotion, start, end, selected_candidate_id }
+  -> updated scene
+
+POST /api/jobs/{id}/scenes/{index}/search    json: { query }
+  -> appends new candidates to that scene, returns the full candidate list
+
+POST /api/jobs/{id}/export
+  -> starts the render, job.status becomes "exporting" then "done"
+
+GET  /api/jobs/{id}/download
+  -> the finished MP4
+```
+
+## What's tested vs. what needs your keys
+
+Verified during development, without external API calls:
+- The full ffmpeg render chain (motion → concat → subtitle burn-in → music
+  mix → mux) against synthetic clips — confirmed correct 1080p H.264/AAC
+  output with visible burned-in subtitles.
+- The complete prepare → review-edit → re-search → export flow through the
+  actual FastAPI routes, with the AI-service calls mocked — including the
+  "no stock match found" path correctly falling back to an AI placeholder
+  candidate that the review UI can show and the export step can generate.
+
+Needs your keys to exercise for real: scene splitting (Claude), voice
+alignment (Whisper), and actual stock/AI results. Drop your keys into
+`backend/.env` and run one short script through it as your first live
+smoke test.
+
+## Deploying this as a hosted website
+
+This needs a real, always-on process — ffmpeg renders take real wall-clock
+time and the app keeps job state in memory while it works. That rules out
+serverless platforms (Vercel, Netlify, Cloudflare Pages/Workers): they kill
+requests after a short timeout and can't run ffmpeg as a background process.
+
+**Recommended: Render.com** (Railway.app works the same way if you prefer it).
+Both take a Dockerfile directly, give you a normal dashboard for environment
+variables — that's where the API keys go, no code edits needed — and support
+a persistent disk so rendered videos survive a restart.
+
+1. Push this folder to a GitHub repo (it already includes `Dockerfile` and
+   `render.yaml`).
+2. On Render: **New → Blueprint**, point it at the repo. It reads
+   `render.yaml` and sets up the service, disk, and the env var slots
+   automatically — you just fill in the values in the dashboard:
+   `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`,
+   `STABILITY_API_KEY`, `RUNWAY_API_KEY`, and `ACCESS_PASSWORD`.
+3. Deploy. You get a public URL.
+
+**Set `ACCESS_PASSWORD`.** The moment this is a public URL, anyone who finds
+it can trigger renders that spend *your* API credits. Setting this env var
+turns on a login prompt (any username, this password) for the whole site —
+leave it unset only if you're fine with the link being open to anyone who
+has it. Share the password out of band (not in the same message as the URL).
+
+**If you outgrow a single server**: the persistent disk + in-memory job dict
+works fine for one person or a small team hitting it casually. If you need
+multiple people rendering heavier videos at once, the two things to change
+first are (1) move `JOBS` in `main.py` to Redis or a database so job state
+survives restarts and is shared across instances, and (2) move the actual
+render work (`export_pipeline`) to a separate worker process/queue instead of
+a thread in the web process, so a long render can't block new requests.
+
+### Running the container locally first (recommended before deploying)
+
+```bash
+docker build -t reel .
+docker run -p 8000:8000 --env-file backend/.env reel
+```
+
+If this works locally, it'll work identically on Render/Railway — they run
+the same Dockerfile.
+
+## Known limitations / next steps
+
+- **Runway's API surface shifts between versions.** `ai_generator.py` targets
+  their async text-to-video task API — adjust `RUNWAY_BASE_URL` and the
+  request/response shape if your account differs; nothing downstream needs
+  to change since it only wants a local file path back.
+- **Retiming a scene doesn't yet auto-shift its neighbors.** If you stretch
+  scene 2's end time, scene 3 doesn't automatically start later — you'd need
+  to adjust it too. A good next step: add a "snap to previous scene's end"
+  option in the review UI.
+- **Sound effects** are wired into `video_assembler.mix_audio` (pass a list of
+  `(path, start_seconds)` tuples) but nothing in the review UI surfaces them
+  yet — natural next step is to let the scene splitter also tag an optional
+  SFX keyword per scene and search a free SFX API the same way stock footage
+  is searched, then let it show up as another swappable option in review.
+- **Job state is in-memory** (`JOBS` dict in `main.py`). Fine for local/single
+  -user use; swap for persisted storage if you need jobs to survive a restart
+  or want multiple people using it at once.

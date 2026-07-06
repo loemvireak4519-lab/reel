@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: reel
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: PIXABAY_API_KEY
+        sync: false
+      - key: STABILITY_API_KEY
+        sync: false
+      - key: RUNWAY_API_KEY
+        sync: false
+      - key: ACCESS_PASSWORD
+        sync: false
+    disk:
+      name: reel-storage
+      mountPath: /app/backend/storage
+      sizeGB: 5

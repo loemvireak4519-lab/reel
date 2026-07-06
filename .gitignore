@@ -1,0 +1,5 @@
+backend/storage/*
+!backend/storage/.gitkeep
+**/__pycache__/
+**/*.pyc
+.env

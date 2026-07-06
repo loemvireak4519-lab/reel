@@ -183,6 +183,17 @@ Two pickers in the input form beyond what's described above:
   via `GET /api/voices/preview` (a small real cost per click, unlike
   ElevenLabs). See `pipeline/voices.py`.
 
+## Theme picker — starter scripts for popular niches
+
+A "Theme" dropdown sits above the Script box with 10 of the strongest niches
+for narrated/faceless video in 2026 (based on current CPM and growth data):
+Personal Finance, AI & Tech Tutorials, Motivation, Documentary/History,
+True Story/Narrative Drama, Health & Wellness, Travel, Product Reviews,
+Micro-History, and Sleep/Ambient. Picking one loads a short original starter
+script into the Script box — not a template to use verbatim, just a running
+start you edit into your own thing. This is entirely client-side
+(`THEME_SCRIPTS` in `frontend/app.js`) — no backend call, no cost, instant.
+
 ## Long videos (10+ minutes)
 
 A 10-minute script is roughly 1,300-1,500 words — enough to exceed both

@@ -158,6 +158,34 @@ voicePreviewBtn.addEventListener("click", async () => {
   }
 });
 
+// ---------------- Theme picker: starter scripts for popular niches ----------------
+
+const THEME_SCRIPTS = {
+  finance: "Most people think building wealth requires a huge salary. It doesn't. It requires a system. Today we're breaking down the exact framework for turning a modest monthly income into a real investment habit — starting with the one percent rule that changes how you think about every purchase. By the end of this video, you'll have a simple three-step plan you can start using this afternoon.",
+  ai_tech: "A new AI tool drops almost every week now, and most of them promise to change how you work. Today we're testing one that claims to cut hours of manual work down to minutes. We'll walk through a real setup from scratch, show you exactly where it struggles, and give you an honest verdict on whether it's actually worth adding to your workflow.",
+  motivation: "There's a moment right before you quit where everything feels heaviest. That moment isn't a sign to stop. It's a sign you're closer than you think. Today we're talking about the small, unglamorous habits that carry people through the hardest stretch of any goal — the one percent choices nobody sees, made on the days when nobody's watching.",
+  documentary: "In a quiet corner of the world, a discovery changed how historians understood an entire era. This is the story of how it happened, the people who found it, and the questions it raised that are still being debated today. We'll trace the timeline from the first clue to the moment everything clicked into place.",
+  true_story: "She didn't expect the phone call that changed everything. What started as an ordinary Tuesday turned into the beginning of a story she'd spend the next two years untangling. This is what happened when the truth finally came out — and why nobody saw it coming.",
+  health: "Small daily habits shape your long-term health more than any single big decision ever will. Today we're looking at five changes backed by real research that take less than ten minutes a day, why they work at a biological level, and how to actually stick with them past the first week.",
+  travel: "Some places change the way you see the rest of the world. This is a journey through a destination most travelers overlook — the food, the people, the unexpected turns — and why it might just be worth rearranging your next trip to see it for yourself.",
+  product_review: "This device showed up with a lot of promises and a price tag to match. We've spent the last two weeks testing it in real conditions to find out if it holds up. Here's what worked, what didn't, and whether it actually earns a spot in your setup.",
+  history: "Most people have never heard of this event, even though it quietly shaped the region for generations. Buried in old records and a handful of surviving accounts, the full story is stranger — and more human — than the footnotes suggest. Here's what actually happened.",
+  ambient: "Let the sound of gentle rain settle around you as the light fades and the evening slows down. There's nowhere to be and nothing to do but breathe and let each thought pass by like clouds. Just settle in, and let the stillness take over.",
+};
+
+const themePicker = document.getElementById("themePicker");
+themePicker.addEventListener("change", () => {
+  const key = themePicker.value;
+  if (!key) return;
+
+  if (scriptTextarea.value.trim() && !confirm("This will replace your current script text. Continue?")) {
+    themePicker.value = "";
+    return;
+  }
+
+  scriptTextarea.value = THEME_SCRIPTS[key];
+});
+
 // ---------------- YouTube import: extract transcript, rewrite as original script ----------------
 
 const youtubeUrlInput = document.getElementById("youtubeUrl");
